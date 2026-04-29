@@ -13,7 +13,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ onAskQuestionDetected, activeAskQuestion, activeSuggestMemory }: ChatViewProps) {
-  const { chats, activeChatId, updateChat, providers, selectedModelId, enabledModelIds, streamingEnabled, memories, langSearchApiKey, defaultWebSearchEnabled, setDefaultWebSearchEnabled } = useStore()
+  const { chats, activeChatId, updateChat, providers, selectedModelId, enabledModelIds, streamingEnabled, memories, langSearchApiKey, setDefaultWebSearchEnabled } = useStore()
   const [isLoading, setIsLoading] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamAbortRef = useRef<(() => void) | null>(null)

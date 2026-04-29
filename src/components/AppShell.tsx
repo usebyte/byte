@@ -18,6 +18,7 @@ import type { AskQuestionPayload, SuggestMemoryPayload, Message } from '../types
 
 export function AppShell() {
   const { activeView, theme, layoutMode, fontFamily, headingFont, chats, activeChatId, updateChat, addMemory } = useStore()
+  const [updateAvailable, setUpdateAvailable] = useState<string | null>(null)
   const [activeAskQuestion, setActiveAskQuestion] = useState<AskQuestionPayload | null>(null)
   const [activeSuggestMemory, setActiveSuggestMemory] = useState<SuggestMemoryPayload | null>(null)
   const chat = chats.find((c) => c.id === activeChatId)
@@ -32,6 +33,21 @@ export function AppShell() {
     document.body.style.setProperty('--font', fontFamily)
     document.body.style.setProperty('--font-d', headingFont)
   }, [fontFamily, headingFont])
+
+  // Check for updates on startup
+  useEffect(() => {
+    (async () => {
+      try {
+        const { check } = await import('@tauri-apps/plugin-updater')
+        const update = await check()
+        if (update?.version && update.version !== '0.1.0') {
+          setUpdateAvailable(update.version)
+        }
+      } catch {
+        // not in Tauri or updater unavailable
+      }
+    })()
+  }, [])
 
   // Listen for suggest_memory events from ChatView/HomeView
   useEffect(() => {
@@ -146,6 +162,22 @@ export function AppShell() {
     <div id="s-app" className="scr on">
       <Sidebar />
       <div className="main">
+        {updateAvailable && (
+          <div className="upd-banner">
+            <span>Byte {updateAvailable} available</span>
+            <a
+              className="upd-link"
+              href="https://github.com/usebyte/byte/releases/latest"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Download
+            </a>
+            <button className="upd-dismiss" onClick={() => setUpdateAvailable(null)}>
+              &times;
+            </button>
+          </div>
+        )}
         <Topbar />
         {renderView()}
         {activeAskQuestion && (

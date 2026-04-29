@@ -886,3 +886,41 @@ input[type=range]{width:100%;accent-color:var(--acc);cursor:pointer}
 .pm-check { color: rgba(var(--acc-r),var(--acc-g),var(--acc-b),1); flex-shrink: 0; }
 .pm-arrow { color: var(--tx4); flex-shrink: 0; }
 .pm-divider { height: 1px; background: var(--bd); margin: 3px 5px; }
+
+/* ─────────────────────────────────────
+   UPDATE BANNER
+   ───────────────────────────────────── */
+.upd-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: rgba(var(--acc-r),var(--acc-g),var(--acc-b),.1);
+  border-bottom: 1px solid rgba(var(--acc-r),var(--acc-g),var(--acc-b),.2);
+  font-size: calc(var(--fs) - .5px);
+  color: var(--tx2);
+  flex-shrink: 0;
+  animation: slideDown .2s ease;
+}
+.upd-link {
+  color: var(--acc);
+  text-decoration: none;
+  font-weight: 500;
+  margin-left: auto;
+}
+.upd-link:hover {
+  text-decoration: underline;
+}
+.upd-dismiss {
+  background: none;
+  border: none;
+  color: var(--tx3);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.upd-dismiss:hover {
+  color: var(--tx);
+  background: rgba(var(--acc-r),var(--acc-g),var(--acc-b),.1);
+}

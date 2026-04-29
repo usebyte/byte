@@ -955,6 +955,26 @@ function ConnectionsPanel() {
 }
 
 function AboutPanel() {
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [updStatus, setUpdStatus] = useState<string | null>(null)
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true)
+    setUpdStatus(null)
+    try {
+      const { check } = await import('@tauri-apps/plugin-updater')
+      const update = await check()
+      if (update?.version) {
+        setUpdStatus(`Version ${update.version} available`)
+      } else {
+        setUpdStatus('You\'re up to date!')
+      }
+    } catch {
+      setUpdStatus('Check failed — open github.com/usebyte/byte/releases')
+    }
+    setCheckingUpdate(false)
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 0 24px', borderBottom: '1px solid var(--bd)', marginBottom: 24 }}>
@@ -963,8 +983,16 @@ function AboutPanel() {
         </div>
         <div>
           <div style={{ fontSize: 'calc(var(--fs) + 3px)', fontWeight: 600, color: 'var(--tx)', letterSpacing: '-.02em', marginBottom: 3 }}>Byte</div>
-          <div style={{ fontSize: 'calc(var(--fs) - 2px)', color: 'var(--tx3)', letterSpacing: '.04em' }}>Version 1.0 &nbsp;·&nbsp; Build 2026.03</div>
+          <div style={{ fontSize: 'calc(var(--fs) - 2px)', color: 'var(--tx3)', letterSpacing: '.04em' }}>Version 0.1.0</div>
         </div>
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        <button className="btn btn-sm" onClick={handleCheckUpdate} disabled={checkingUpdate}>
+          {checkingUpdate ? 'Checking...' : 'Check for Updates'}
+        </button>
+        {updStatus && (
+          <span style={{ marginLeft: 12, fontSize: 'calc(var(--fs) - 1px)', color: 'var(--tx3)' }}>{updStatus}</span>
+        )}
       </div>
 
       <div className="set-h">What is Byte?</div>

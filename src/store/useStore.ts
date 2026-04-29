@@ -13,6 +13,7 @@ import type {
   Project,
 } from '../types'
 import { getDefaultChatConfig } from '../lib/prompts'
+import type { ToolId } from '../types'
 import type { QuickPromptCategory } from '../lib/quickPrompts'
 import { DEFAULT_QUICK_PROMPTS } from '../lib/quickPrompts'
 import type { Skill } from '../types'
@@ -84,6 +85,7 @@ interface AppState {
   setStreamingEnabled: (val: boolean) => void;
   setDefaultResponseStyle: (style: ResponseStyleId) => void;
   setDefaultMemoryEnabled: (enabled: boolean) => void;
+  setDefaultWebSearchEnabled: (enabled: boolean) => void;
   setLangSearchApiKey: (key: string) => void;
   addMemory: (memory: { name: string; content: string }) => void;
   updateMemory: (id: string, updates: { name?: string; content?: string }) => void;

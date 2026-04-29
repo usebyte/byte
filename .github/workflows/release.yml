@@ -1,0 +1,122 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            bundle: Byte_aarch64.dmg
+            bundle-path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+
+          - platform: macos-13
+            target: x86_64-apple-darwin
+            bundle: Byte_x64.dmg
+            bundle-path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+
+          - platform: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bundle: byte_amd64.AppImage
+            bundle-path: src-tauri/target/release/bundle/appimage/*.AppImage
+
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundle: Byte_x64.msi
+            bundle-path: src-tauri/target/release/bundle/msi/*.msi
+
+    runs-on: ${{ matrix.platform }}
+    outputs:
+      ${{ matrix.target }}-sig: ${{ steps.signature.outputs.sig }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install npm deps
+        run: npm ci
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
+      - name: Build
+        run: npm run tauri build -- --target ${{ matrix.target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Rename bundle
+        run: |
+          mkdir -p artifacts
+          cp ${{ matrix.bundle-path }} artifacts/${{ matrix.bundle }}
+
+      - name: Upload bundle to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/${{ matrix.bundle }}
+
+      - name: Upload signature to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/${{ matrix.bundle }}.sig
+
+  update-manifest:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create update manifest
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          VERSION=${TAG#v}
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BASE="https://github.com/${{ github.repository }}/releases/download/$TAG"
+
+          cat <<MANIFEST > update.json
+          {
+            "version": "$VERSION",
+            "notes": "https://github.com/${{ github.repository }}/releases/tag/$TAG",
+            "pub_date": "$DATE",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "",
+                "url": "$BASE/Byte_aarch64.dmg"
+              },
+              "darwin-x86_64": {
+                "signature": "",
+                "url": "$BASE/Byte_x64.dmg"
+              },
+              "linux-x86_64": {
+                "signature": "",
+                "url": "$BASE/byte_amd64.AppImage.tar.gz"
+              },
+              "windows-x86_64": {
+                "signature": "",
+                "url": "$BASE/Byte_x64.msi.zip"
+              }
+            }
+          }
+          MANIFEST
+
+      - name: Upload update manifest to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: update.json
+          generate_release_notes: true

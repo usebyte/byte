@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "highlight.js": "^11.11.0",
     "katex": "^0.16.0",
     "lucide-react": "^1.7.0",
