@@ -1,0 +1,344 @@
+import { useState, memo, useRef, useCallback } from 'react'
+import { Copy, Check, ThumbsUp, ThumbsDown, Share2, RefreshCw, ChevronDown, Search, Loader2, Globe } from 'lucide-react'
+import { MarkdownRenderer } from '../../lib/markdown'
+import type { Message } from '../../types'
+
+interface MessageBubbleProps {
+  message: Message
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function LoadingDots() {
+  return (
+    <span className="loading-dots" style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+      <span style={{ animationDelay: '0ms' }} />
+      <span style={{ animationDelay: '150ms' }} />
+      <span style={{ animationDelay: '300ms' }} />
+    </span>
+  )
+}
+
+function containsAskQuestion(content: string): boolean {
+  return content.includes('"tool":"ask_question"') || 
+         content.includes('"tool": "ask_question"') ||
+         content.includes('<ask_question>');
+}
+
+function getAskQuestionDisplayText(content: string): string {
+  try {
+    const questionMatch = content.match(/"question"\s*:\s*"([^"]+)"/);
+    if (questionMatch) {
+      return questionMatch[1];
+    }
+  } catch {}
+  return 'Asking Question...';
+}
+
+// Hook that returns [ref, visible]. Once visible, stays visible forever.
+function useLazyVisible(): [React.RefCallback<HTMLDivElement>, boolean] {
+  const [visible, setVisible] = useState(false)
+  const observedRef = useRef<HTMLDivElement | null>(null)
+
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    // Check if already in viewport
+    const rect = node.getBoundingClientRect()
+    if (rect.top < window.innerHeight + 600 && rect.bottom > -600) {
+      setVisible(true)
+      return
+    }
+    // Observe until visible
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '600px 0px' }
+    )
+    observer.observe(node)
+    // Cleanup previous observation if ref changes
+    if (observedRef.current && observedRef.current !== node) {
+      observer.disconnect()
+    }
+    observedRef.current = node
+  }, [])
+
+  return [ref, visible]
+}
+
+export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
+  const [copied, setCopied] = useState(false)
+  const [showSources, setShowSources] = useState(true)
+  const [lazyRef, visible] = useLazyVisible()
+
+  const handleCopy = async () => {
+    const success = await copyToClipboard(message.content)
+    if (success) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const isUser = message.role === 'user'
+  const isGenerating = message.status === 'streaming' && !message.content
+  const isStreaming = message.status === 'streaming'
+
+  const isAskQuestionResult = message.content.includes('"tool":"ask_question_result"') ||
+                               message.content.includes('"tool": "ask_question_result"');
+
+  let displayContent = message.content;
+  let showContent = true;
+  
+  // Hidden messages (e.g., search results context) are not rendered
+  if (message.hidden) return null
+
+  // Strip tool calls from display if they are web search tools
+  if (!isUser && displayContent.includes('"tool"') && (displayContent.includes('"web_search"') || displayContent.includes('"news_search"') || displayContent.includes('"search"'))) {
+    // 1. Remove markdown code blocks containing the tool call
+    displayContent = displayContent.replace(/```[\w-]*\s*[\s\S]*?```/g, (match) => {
+      if (match.includes('"tool"') && (match.includes('"web_search"') || match.includes('"news_search"') || match.includes('"search"'))) {
+        return '';
+      }
+      return match;
+    });
+
+    // 2. Remove any remaining raw JSON blocks containing the tool call
+    displayContent = displayContent.replace(/\{[\s\S]*?"tool"\s*:\s*"(?:web_search|news_search|search)"[\s\S]*?\}/g, '');
+    
+    displayContent = displayContent.trim();
+  }
+
+  // Web search sources dropdown - real-time with Searched/Fetched sections
+  const hasSearchSources = message.webSearchSources && message.webSearchSources.length > 0
+  const hasFetchedSources = message.webSearchFetched && message.webSearchFetched.length > 0
+  const isSearching = message.searchPhase === 'searching'
+  const isFetching = message.searchPhase === 'fetching'
+  const searchDone = message.searchPhase === 'done'
+  const showSearchDropdown = hasSearchSources || isSearching || isFetching || searchDone
+
+  if (isUser && isAskQuestionResult) {
+    displayContent = 'Sent Answers';
+  } else if (!isUser && containsAskQuestion(message.content)) {
+    displayContent = getAskQuestionDisplayText(message.content);
+  } else if (isUser && message.content.startsWith('{') && message.content.includes('"tool"')) {
+    showContent = false;
+  }
+
+  if (message.role === 'system') {
+    return (
+      <div ref={lazyRef} className="msg" style={{ justifyContent: 'center' }}>
+        <div className="msg-body" style={{ textAlign: 'center' }}>
+          <div className="msg-txt" style={{ color: 'var(--tx3)', fontSize: 'calc(var(--fs) - 1px)' }}>
+            {message.content}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Decide what to render
+  let content: React.ReactNode
+  if (isUser) {
+    content = showContent ? <span>{displayContent}</span> : <span style={{ color: 'var(--tx3)', fontStyle: 'italic' }}>Sent Answers</span>
+  } else if (isGenerating) {
+    content = <LoadingDots />
+  } else if (isStreaming || visible) {
+    // Streaming or visible — render full markdown
+    content = <MarkdownRenderer content={displayContent} />
+  } else {
+    // Offscreen — show plain text as a lightweight placeholder
+    content = <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--tx2)' }}>{displayContent}</div>
+  }
+
+  // Prepend web search sources for assistant messages with real-time updates
+  if (showSearchDropdown && !isUser) {
+    content = (
+      <>
+        <div
+          style={{
+            background: 'var(--sf2)',
+            border: '1px solid var(--bd)',
+            borderRadius: 10,
+            overflow: 'hidden',
+            transition: 'all 0.25s ease-out',
+            marginBottom: 12,
+          }}
+        >
+          {/* Header - always clickable to toggle */}
+          <div
+            onClick={() => setShowSources(!showSources)}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              userSelect: 'none',
+              transition: 'background 0.15s ease',
+            }}
+          >
+            <Search size={13} style={{ color: 'var(--acc)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 'calc(var(--fs) - 1px)', color: 'var(--tx2)', fontWeight: 500 }}>
+              {isSearching && 'Searching...'}
+              {isFetching && 'Fetching pages...'}
+              {searchDone && 'Search complete'}
+            </span>
+            {(isSearching || isFetching) && (
+              <Loader2 size={13} style={{ color: 'var(--tx3)', animation: 'spin 1s linear infinite' }} />
+            )}
+            <ChevronDown 
+              size={13} 
+              style={{ 
+                color: 'var(--tx3)',
+                transform: showSources ? 'rotate(180deg)' : 'none', 
+                transition: 'transform 0.2s ease-out' 
+              }} 
+            />
+          </div>
+          
+          {/* Expandable content - same background as header */}
+          {showSources && (
+            <div style={{ 
+              padding: '0 12px 10px',
+              animation: 'fadeIn 0.2s ease-out',
+            }}>
+              {/* Divider */}
+              <div style={{ height: 1, background: 'var(--bd)', marginBottom: 10 }} />
+              
+              {/* Searched section */}
+              {hasSearchSources && (
+                <div style={{ marginBottom: hasFetchedSources ? 10 : 0 }}>
+                  <div style={{ 
+                    fontSize: '10px', 
+                    fontWeight: 600, 
+                    color: 'var(--tx3)', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    marginBottom: 6,
+                  }}>
+                    Searched
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {message.webSearchSources!.map((s, i) => (
+                      <a
+                        key={`searched-${i}`}
+                        href={s.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: 'calc(var(--fs) - 2px)',
+                          color: 'var(--acc)',
+                          textDecoration: 'none',
+                          padding: '3px 0',
+                          transition: 'opacity 0.2s ease-out',
+                          animation: 'fadeIn 0.2s ease-out',
+                        }}
+                        title={s.url}
+                      >
+                        <Globe size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.title || s.url}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Fetched section */}
+              {hasFetchedSources && (
+                <div>
+                  <div style={{ 
+                    fontSize: '10px', 
+                    fontWeight: 600, 
+                    color: 'var(--acc)', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    marginBottom: 6,
+                  }}>
+                    Fetched
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {message.webSearchFetched!.map((s, i) => (
+                      <a
+                        key={`fetched-${i}`}
+                        href={s.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: 'calc(var(--fs) - 2px)',
+                          color: 'var(--acc)',
+                          textDecoration: 'none',
+                          padding: '3px 0',
+                          transition: 'opacity 0.2s ease-out',
+                          animation: 'fadeIn 0.2s ease-out',
+                        }}
+                        title={s.url}
+                      >
+                        <Globe size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.title || s.url}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <div style={{ marginTop: 8 }}>
+          {content}
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <div ref={lazyRef} className={`msg${isUser ? ' u' : ''}`}>
+      <div className="msg-body">
+        <div className="msg-txt">
+          {content}
+        </div>
+        <div className="msg-acts">
+          <button className="msg-act" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+          </button>
+          {!isUser && (
+            <>
+              <button className="msg-act" title="Like">
+                <ThumbsUp size={13} />
+              </button>
+              <button className="msg-act" title="Dislike">
+                <ThumbsDown size={13} />
+              </button>
+              <button className="msg-act" title="Share">
+                <Share2 size={13} />
+              </button>
+              <button className="msg-act" title="Regenerate">
+                <RefreshCw size={13} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+})

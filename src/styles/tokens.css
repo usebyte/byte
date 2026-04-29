@@ -1,0 +1,78 @@
+:root {
+  /* DEFAULT = LIGHT */
+
+  /* ── Core Colors ── */
+  --bg: #f5f3ef;
+  --sb: #ede9e2;
+  --sf: #ffffff;
+  --sf2: #f5f1ea;
+  --sf3: #ede8df;
+  --bd: #e0dbd3;
+  --bd2: #d4cec5;
+  --bd3: #b8b0a6;
+  --tx: #1c1c18;
+  --tx2: #5a5248;
+  --tx3: #8a8278;
+  --tx4: #b8b0a6;
+  --acc: #6AB8F7;
+  --acc-r: 106; --acc-g: 184; --acc-b: 247;
+  --chip: rgba(0,0,0,.03);
+  --logo: #1a1a16;
+  --line: #d4cec5;
+  --grid-line: #ded9d0;
+
+  /* ── Accent States ── */
+  --acc-hover: rgba(106,184,247,.07);
+  --acc-active: rgba(106,184,247,.10);
+  --acc-pressed: rgba(106,184,247,.12);
+  --acc-border: rgba(106,184,247,.50);
+  --acc-glow: rgba(106,184,247,.18);
+  --acc-soft: rgba(106,184,247,.08);
+
+  /* ── Feedback Colors ── */
+  --danger: #e05555;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-fill: #f76a6a;
+  --warning: #f7a96a;
+
+  /* ── Code ── */
+  --code-bg: #EDE8DF;
+  --code-icon: #4a9fd4;
+
+  /* ── Utility ── */
+  --white: #ffffff;
+  --msg-user-bg: #ede8df;
+  --msg-user-border: #d4cec5;
+  --icon-opacity: .65;
+
+  /* ── Radius ── */
+  --r: 9px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 14px;
+
+  /* ── Typography ── */
+  --font: 'Geist Mono', monospace;
+  --font-d: 'Instrument Serif', serif;
+  --fs: 13px;
+
+  /* ── Spacing ── */
+  --pad-xs: 4px;
+  --pad-sm: 8px;
+  --pad-md: 14px;
+  --pad-lg: 24px;
+  --pad-xl: 32px;
+  --msg-pad-x: 28px;
+  --input-pad: 16px;
+  --sidebar-pad: 10px;
+
+  /* ── Layout ── */
+  --sb-w: 236px;
+  --topbar-h: 46px;
+  --msg-max-w: 720px;
+  --input-max-w: 680px;
+
+  /* ── Timing ── */
+  --ease: .18s ease;
+}

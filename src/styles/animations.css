@@ -1,0 +1,321 @@
+/* ─────────────────────────────────────
+   ANIMATIONS & MICRO-INTERACTIONS
+   Following Emil Kowalski's principles
+   ───────────────────────────────────── */
+
+/* Custom easing curves - stronger than defaults */
+:root {
+  /* Strong ease-out for UI interactions - feels responsive */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  
+  /* Smooth ease-in-out for on-screen movement */
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  
+  /* iOS-like drawer curve */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  
+  /* Quick ease for hover states */
+  --ease-quick: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── BUTTON PRESS FEEDBACK ──
+   Buttons must feel responsive - scale down on press */
+.btn, .btn-icon, .send, .t-btn, .rail-btn, .label-btn, .model-chip, .sug-pill, .chip {
+  transition: transform 160ms var(--ease-out-strong), 
+              background-color 200ms var(--ease-quick), 
+              border-color 200ms var(--ease-quick), 
+              color 150ms var(--ease-quick);
+}
+
+.btn:active, .btn-icon:active, .send:active, .t-btn:active, 
+.rail-btn:active, .label-btn:active, .model-chip:active, 
+.sug-pill:active, .chip:active {
+  transform: scale(0.97);
+}
+
+/* Focus indicators */
+.btn:focus-visible, .btn-icon:focus-visible {
+  outline: 2px solid rgba(var(--acc-r), var(--acc-g), var(--acc-b), 0.5);
+  outline-offset: 2px;
+}
+
+/* ── MESSAGE ENTRY ANIMATIONS ──
+   Messages animate in smoothly when they appear */
+@keyframes messageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.msg {
+  animation: messageEnter 280ms var(--ease-out-strong) both;
+}
+
+/* Stagger message entries */
+.msg:nth-child(1) { animation-delay: 0ms; }
+.msg:nth-child(2) { animation-delay: 40ms; }
+.msg:nth-child(3) { animation-delay: 80ms; }
+.msg:nth-child(4) { animation-delay: 120ms; }
+.msg:nth-child(5) { animation-delay: 160ms; }
+.msg:nth-child(6) { animation-delay: 200ms; }
+.msg:nth-child(n+7) { animation-delay: 240ms; }
+
+/* User messages come from the right */
+@keyframes messageEnterUser {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.msg.u {
+  animation: messageEnterUser 240ms var(--ease-out-strong) both;
+}
+
+/* ── CHAT LIST ITEM ANIMATIONS ── */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.chat-list-item {
+  animation: slideInRight 200ms var(--ease-out-strong) both;
+}
+
+.chat-list-item:nth-child(1) { animation-delay: 0ms; }
+.chat-list-item:nth-child(2) { animation-delay: 30ms; }
+.chat-list-item:nth-child(3) { animation-delay: 60ms; }
+.chat-list-item:nth-child(4) { animation-delay: 90ms; }
+.chat-list-item:nth-child(5) { animation-delay: 120ms; }
+.chat-list-item:nth-child(n+6) { animation-delay: 150ms; }
+
+/* ── HOVER LIFT EFFECT ──
+   Subtle lift on cards and interactive elements */
+.chat-list-item, .proj-card, .skill-card, .agent-card {
+  transition: transform 200ms var(--ease-out-strong),
+              background-color 200ms var(--ease-quick),
+              border-color 200ms var(--ease-quick),
+              box-shadow 200ms var(--ease-quick);
+}
+
+.chat-list-item:hover, .proj-card:hover, .skill-card:hover, .agent-card:hover {
+  transform: translateY(-1px);
+}
+
+/* ── SIDEBAR ITEM ANIMATIONS ── */
+.sb-item, .sb-rec, .sb-row {
+  transition: background-color 150ms var(--ease-quick),
+              color 150ms var(--ease-quick),
+              transform 160ms var(--ease-out-strong);
+}
+
+.sb-item:active, .sb-rec:active, .sb-row:active {
+  transform: scale(0.98);
+}
+
+/* ── INPUT BOX FOCUS ANIMATION ── */
+.in-box {
+  transition: box-shadow 200ms var(--ease-quick),
+              border-color 200ms var(--ease-quick),
+              transform 200ms var(--ease-out-strong);
+}
+
+.in-box:focus-within {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* ── TOGGLE SWITCH ANIMATION ── */
+.tog::after {
+  transition: transform 200ms var(--ease-out-strong);
+}
+
+/* ── MODAL/POPOVER ENTRY ──
+   Scale from 0.95 with opacity - never from 0 */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.mm-box, .sug-menu, .chat-menu-dropdown, .slash-menu {
+   animation: modalEnter 180ms var(--ease-out-strong) both;
+   transform-origin: top center;
+}
+
+.slash-menu {
+   transform-origin: bottom center;
+}
+
+/* Popovers from trigger point */
+.sug-menu {
+  transform-origin: bottom center;
+}
+
+/* ── SELECTION BAR SLIDE DOWN ── */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.selection-bar {
+  animation: slideDown 220ms var(--ease-out-strong) both;
+}
+
+/* ── MESSAGE ACTIONS APPEAR ── */
+.msg-acts {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 150ms var(--ease-quick), 
+              transform 150ms var(--ease-out-strong);
+}
+
+.msg:hover .msg-acts {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── LOADING SPINNER ── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── LOADING DOTS ── */
+@keyframes loadingDot {
+  0%, 60%, 100% { 
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% { 
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  background: var(--tx3);
+  border-radius: 50%;
+  animation: loadingDot 1.2s ease-in-out infinite;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: 0ms; }
+.loading-dots span:nth-child(2) { animation-delay: 150ms; }
+.loading-dots span:nth-child(3) { animation-delay: 300ms; }
+
+/* ── STOP BUTTON PULSE ── */
+@keyframes pulse-red {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(224, 85, 85, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(224, 85, 85, 0);
+  }
+}
+
+.send-stopping {
+  animation: pulse-red 1.5s ease-in-out infinite;
+}
+
+/* ── SUGGESTION PILL HOVER ── */
+.sug-pill {
+  transition: transform 180ms var(--ease-out-strong),
+              border-color 180ms var(--ease-quick),
+              background-color 180ms var(--ease-quick);
+}
+
+.sug-pill:hover {
+  transform: translateY(-2px);
+}
+
+/* ── REDUCED MOTION ── */
+@media (prefers-reduced-motion: reduce) {
+  .msg,
+  .chat-list-item,
+  .mm-box,
+  .sug-menu,
+  .chat-menu-dropdown,
+  .selection-bar {
+    animation: none;
+  }
+  
+  .btn, .btn-icon, .send, .t-btn, .rail-btn, .label-btn,
+  .model-chip, .sug-pill, .chip, .chat-list-item,
+  .proj-card, .skill-card, .agent-card, .sb-item,
+  .sb-rec, .sb-row, .in-box, .msg-acts {
+    transition: opacity 100ms ease;
+    transform: none !important;
+  }
+  
+  .loading-spinner {
+    animation: none;
+  }
+  
+  .send-stopping {
+    animation: none;
+  }
+}
+
+/* ── FADE IN ANIMATION ──
+   For search sources appearing in real-time */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── TOUCH DEVICE OPTIMIZATIONS ── */
+@media (hover: none) and (pointer: coarse) {
+  /* Disable hover lift effects on touch devices */
+  .chat-list-item:hover,
+  .proj-card:hover,
+  .skill-card:hover,
+  .agent-card:hover,
+  .sug-pill:hover {
+    transform: none;
+  }
+  
+  /* Keep active states for touch feedback */
+  .btn:active,
+  .btn-icon:active,
+  .send:active {
+    transform: scale(0.97);
+  }
+}
