@@ -38,6 +38,9 @@ jobs:
             updater-id: windows-x86_64
 
     runs-on: ${{ matrix.platform }}
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -63,14 +66,13 @@ jobs:
 
       - name: Build
         run: npm run tauri build -- --target ${{ matrix.target }}
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Capture Artifacts
         shell: bash
         run: |
           mkdir -p artifacts
+
+          BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle"
 
           # Copy main installer
           INSTALLER=$(ls ${{ matrix.bundle-path }} 2>/dev/null | head -n 1) || true
@@ -78,41 +80,50 @@ jobs:
             cp "$INSTALLER" "artifacts/${{ matrix.bundle }}"
           fi
 
-          # Find updater bundle and signature
-          BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle"
+          # Determine updater archive name and source
           if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
-            UPDATER_SRC=$(ls "$BUNDLE_DIR/msi/"*.msi.zip 2>/dev/null | head -n 1) || true
             UPDATER_NAME="Byte_x64.msi.zip"
-          elif [[ "${{ matrix.platform }}" == "ubuntu-latest" ]]; then
-            UPDATER_SRC=$(ls "$BUNDLE_DIR/appimage/"*.AppImage.tar.gz 2>/dev/null | head -n 1) || true
-            UPDATER_NAME="byte_amd64.AppImage.tar.gz"
-          else
-            APP_BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/macos"
-            UPDATER_SRC=$(ls "$APP_BUNDLE_DIR"/*.app.tar.gz 2>/dev/null | head -n 1) || true
-            UPDATER_NAME="Byte_${{ matrix.target }}.app.tar.gz"
-
-            # Tauri 2 may not auto-generate .app.tar.gz for updater; create it if missing
-            if [ -z "$UPDATER_SRC" ]; then
-              BUNDLE_APP=$(ls -d "$APP_BUNDLE_DIR"/*.app 2>/dev/null | head -n 1) || true
-              if [ -n "$BUNDLE_APP" ]; then
-                echo "No .app.tar.gz found. Creating $UPDATER_NAME..."
-                tar czf "$APP_BUNDLE_DIR/$UPDATER_NAME" -C "$APP_BUNDLE_DIR" "$(basename "$BUNDLE_APP")"
-                UPDATER_SRC="$APP_BUNDLE_DIR/$UPDATER_NAME"
-              fi
+            UPDATER_DIR="$BUNDLE_DIR/msi"
+            UPDATER_SRC=$(ls "$UPDATER_DIR/"*.msi.zip 2>/dev/null | head -n 1) || true
+            if [ -z "$UPDATER_SRC" ] && [ -f "$INSTALLER" ]; then
+              echo "Creating $UPDATER_NAME from MSI..."
+              (cd "$(dirname "$INSTALLER")" && zip -q "$UPDATER_NAME" "$(basename "$INSTALLER")") || true
+              UPDATER_SRC="$UPDATER_DIR/$UPDATER_NAME"
             fi
-
-            # Sign the updater archive if no .sig file exists yet
-            if [ -f "$UPDATER_SRC" ] && [ ! -f "$UPDATER_SRC.sig" ] && [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-              echo "Signing updater archive..."
-              npx tauri signer sign "$UPDATER_SRC" > "$UPDATER_SRC.sig"
+          elif [[ "${{ matrix.platform }}" == "ubuntu-latest" ]]; then
+            UPDATER_NAME="byte_amd64.AppImage.tar.gz"
+            UPDATER_DIR="$BUNDLE_DIR/appimage"
+            UPDATER_SRC=$(ls "$UPDATER_DIR/"*.AppImage.tar.gz 2>/dev/null | head -n 1) || true
+            if [ -z "$UPDATER_SRC" ] && [ -f "$INSTALLER" ]; then
+              echo "Creating $UPDATER_NAME from AppImage..."
+              tar czf "$UPDATER_DIR/$UPDATER_NAME" -C "$(dirname "$INSTALLER")" "$(basename "$INSTALLER")"
+              UPDATER_SRC="$UPDATER_DIR/$UPDATER_NAME"
+            fi
+          else
+            UPDATER_NAME="Byte_${{ matrix.target }}.app.tar.gz"
+            UPDATER_DIR="$BUNDLE_DIR/macos"
+            UPDATER_SRC=$(ls "$UPDATER_DIR/"*.app.tar.gz 2>/dev/null | head -n 1) || true
+            if [ -z "$UPDATER_SRC" ]; then
+              BUNDLE_APP=$(ls -d "$UPDATER_DIR/"*.app 2>/dev/null | head -n 1) || true
+              if [ -n "$BUNDLE_APP" ]; then
+                echo "Creating $UPDATER_NAME from .app bundle..."
+                tar czf "$UPDATER_DIR/$UPDATER_NAME" -C "$UPDATER_DIR" "$(basename "$BUNDLE_APP")"
+                UPDATER_SRC="$UPDATER_DIR/$UPDATER_NAME"
+              fi
             fi
           fi
 
+          # Sign the updater archive if no .sig file exists yet
+          if [ -f "$UPDATER_SRC" ] && [ ! -f "$UPDATER_SRC.sig" ] && [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "Signing updater archive..."
+            npx tauri signer sign "$UPDATER_SRC" > "$UPDATER_SRC.sig"
+          fi
+
+          # Copy updater artifacts to artifacts/
           if [ -f "$UPDATER_SRC" ]; then
             cp "$UPDATER_SRC" "artifacts/$UPDATER_NAME"
             if [ -f "$UPDATER_SRC.sig" ]; then
               cp "$UPDATER_SRC.sig" "artifacts/$UPDATER_NAME.sig"
-              # Also save sig for the manifest job
               echo "$(cat $UPDATER_SRC.sig)" > "artifacts/${{ matrix.updater-id }}.sig.txt"
             fi
           fi
@@ -132,6 +143,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all signatures
         uses: actions/download-artifact@v4
         with:

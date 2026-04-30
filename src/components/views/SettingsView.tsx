@@ -657,11 +657,13 @@ function GeneralPanel({
   streamingEnabled: boolean
   onStreamingChange: (val: boolean) => void
 }) {
+  const autoUpdateEnabled = useStore((s) => s.autoUpdateEnabled)
+  const setAutoUpdateEnabled = useStore((s) => s.setAutoUpdateEnabled)
+  const isMac = navigator.userAgent.toLowerCase().includes("mac")
   const [name, setName] = useState('')
   const [settings, setSettings] = useState({
     autoSave: true,
     telemetry: false,
-    updates: true,
     hardware: true,
   })
 
@@ -704,12 +706,22 @@ function GeneralPanel({
         </div>
         <button className={`tog ${settings.telemetry ? 'on' : ''}`} onClick={() => setSettings({ ...settings, telemetry: !settings.telemetry })} />
       </div>
-      <div className="set-row">
+      <div className="set-row" style={{ opacity: isMac ? 0.5 : 1 }}>
         <div>
-          <div className="set-rl">Check for updates</div>
-          <div className="set-rsub">Notify when a new version is available</div>
+          <div className="set-rl">Auto-update</div>
+          <div className="set-rsub">
+            {isMac ? 'Coming to macOS soon' : 'Automatically download and install updates'}
+          </div>
         </div>
-        <button className={`tog ${settings.updates ? 'on' : ''}`} onClick={() => setSettings({ ...settings, updates: !settings.updates })} />
+        <div style={{ position: 'relative' }}>
+          <button
+            className={`tog ${autoUpdateEnabled ? 'on' : ''}`}
+            onClick={() => !isMac && setAutoUpdateEnabled(!autoUpdateEnabled)}
+            disabled={isMac}
+            title={isMac ? 'Coming to macOS soon' : ''}
+          />
+          {isMac && <div style={{ position: 'absolute', inset: 0 }} title="Coming to macOS soon" />}
+        </div>
       </div>
       <div className="set-row" style={{ border: 'none' }}>
         <div>

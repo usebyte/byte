@@ -57,11 +57,25 @@ export function AppShell() {
   // Check for updates on startup and periodically
   useEffect(() => {
     const checkForUpdates = async () => {
+      if (!useStore.getState().autoUpdateEnabled) return;
       try {
         const { check } = await import("@tauri-apps/plugin-updater");
         const update = await check();
         if (update?.version && update.version !== "0.1.0") {
-          setUpdateAvailable({ version: update.version, installing: false });
+          const isMac = navigator.userAgent.toLowerCase().includes("mac");
+          if (isMac) {
+            setUpdateAvailable({ version: update.version, installing: false });
+          } else {
+            setUpdateAvailable({ version: update.version, installing: true });
+            try {
+              await update.downloadAndInstall();
+              const { relaunch } = await import("@tauri-apps/plugin-process");
+              await relaunch();
+            } catch (error) {
+              console.error("Failed to install update:", error);
+              setUpdateAvailable({ version: update.version, installing: false });
+            }
+          }
         }
       } catch {
         // not in Tauri or updater unavailable

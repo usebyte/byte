@@ -117,6 +117,10 @@ interface AppState {
   addProjectFile: (projectId: string, file: ProjectFile) => void;
   removeProjectFile: (projectId: string, fileId: string) => void;
 
+  // Auto Update
+  autoUpdateEnabled: boolean;
+  setAutoUpdateEnabled: (val: boolean) => void;
+
   // Skills Actions
   setSkills: (skills: Skill[]) => void;
   addSkill: (skill: Omit<Skill, 'id' | 'createdAt'>) => string;
@@ -184,6 +188,7 @@ export const useStore = create<AppState>()(
       projects: [],
       activeProjectId: null,
       skills: [],
+      autoUpdateEnabled: true,
 
       setTheme: (theme) => set({ theme }),
       setLayoutMode: (layoutMode) => set({ layoutMode }),
@@ -492,6 +497,8 @@ export const useStore = create<AppState>()(
               : p
           ),
         })),
+
+      setAutoUpdateEnabled: (autoUpdateEnabled) => set({ autoUpdateEnabled }),
 
       // Skills Actions
       setSkills: (skills) => set({ skills }),
