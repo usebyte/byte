@@ -68,13 +68,15 @@ jobs:
           APPLE_DEV_CERT: ${{ secrets.APPLE_DEV_CERT }}
           APPLE_DEV_CERT_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
         run: |
+          KEYCHAIN=build.keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/$KEYCHAIN
           if [ -n "$APPLE_DEV_CERT" ] && [ -n "$APPLE_DEV_CERT_PASSWORD" ]; then
             echo "$APPLE_DEV_CERT" | base64 -d > /tmp/byte_dev_cert.p12
-            security create-keychain -p temp temp.keychain
-            security default-keychain -s temp.keychain
-            security unlock-keychain -p temp temp.keychain
-            security import /tmp/byte_dev_cert.p12 -k temp.keychain -P "$APPLE_DEV_CERT_PASSWORD" -T /usr/bin/codesign
-            security set-key-partition-list -S apple-tool:,apple:,/usr/bin/codesign -k temp temp.keychain
+            security create-keychain -p temp "$KEYCHAIN_PATH"
+            security default-keychain -s "$KEYCHAIN_PATH"
+            security unlock-keychain -p temp "$KEYCHAIN_PATH"
+            security import /tmp/byte_dev_cert.p12 -k "$KEYCHAIN_PATH" -P "$APPLE_DEV_CERT_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,/usr/bin/codesign -k temp "$KEYCHAIN_PATH" 2>/dev/null || true
             echo "✅ Certificate imported"
           else
             echo "⚠️ APPLE_DEV_CERT or APPLE_DEV_CERT_PASSWORD not set, skipping sign"
