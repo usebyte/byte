@@ -11,6 +11,7 @@ import type {
   ResponseStyleId,
   SettingsSection,
   Project,
+  ProjectFile,
 } from '../types'
 import { getDefaultChatConfig } from '../lib/prompts'
 import type { ToolId } from '../types'
@@ -53,6 +54,7 @@ interface AppState {
 
   // Projects
   projects: Project[];
+  activeProjectId: string | null;
 
   // Skills
   skills: Skill[];
@@ -110,6 +112,10 @@ interface AppState {
   unarchiveProject: (id: string) => void;
   addChatToProject: (projectId: string, chatId: string) => void;
   removeChatFromProject: (projectId: string, chatId: string) => void;
+  setActiveProjectId: (id: string | null) => void;
+  updateProjectInstructions: (id: string, instructions: string) => void;
+  addProjectFile: (projectId: string, file: ProjectFile) => void;
+  removeProjectFile: (projectId: string, fileId: string) => void;
 
   // Skills Actions
   setSkills: (skills: Skill[]) => void;
@@ -176,6 +182,7 @@ export const useStore = create<AppState>()(
       memories: [],
       quickPrompts: DEFAULT_QUICK_PROMPTS,
       projects: [],
+      activeProjectId: null,
       skills: [],
 
       setTheme: (theme) => set({ theme }),
@@ -233,6 +240,10 @@ export const useStore = create<AppState>()(
         set((s) => ({
           chats: s.chats.filter((c) => c.id !== id),
           activeChatId: s.activeChatId === id ? null : s.activeChatId,
+          projects: s.projects.map((p) => ({
+            ...p,
+            chatIds: p.chatIds.filter((cid) => cid !== id),
+          })),
         })),
       clearAllChats: () =>
         set({
@@ -285,12 +296,20 @@ export const useStore = create<AppState>()(
           saved: false,
           config: { ...defaultConfig, ...config },
         };
+        const activeProjectId = get().activeProjectId
         set({
           chats: [...get().chats, chat],
           activeChatId: chat.id,
           activeView: 'chat',
-        });
-        return chat.id;
+          projects: activeProjectId
+            ? get().projects.map((p) =>
+                p.id === activeProjectId && !p.chatIds.includes(chat.id)
+                  ? { ...p, chatIds: [...p.chatIds, chat.id], updatedAt: Date.now() }
+                  : p
+              )
+            : get().projects,
+        })
+        return chat.id
       },
       setDisappearingMessages: (disappearingMessages) => set({ disappearingMessages }),
       setDisappearingInterval: (disappearingInterval) => set({ disappearingInterval }),
@@ -402,6 +421,8 @@ export const useStore = create<AppState>()(
             ...s.projects,
             {
               ...project,
+              customInstructions: project.customInstructions || '',
+              files: project.files || [],
               id,
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -448,6 +469,29 @@ export const useStore = create<AppState>()(
               : p
           ),
         })),
+      setActiveProjectId: (activeProjectId) => set({ activeProjectId }),
+      updateProjectInstructions: (id, customInstructions) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === id ? { ...p, customInstructions, updatedAt: Date.now() } : p
+          ),
+        })),
+      addProjectFile: (projectId, file) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId
+              ? { ...p, files: [...p.files, file], updatedAt: Date.now() }
+              : p
+          ),
+        })),
+      removeProjectFile: (projectId, fileId) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId
+              ? { ...p, files: p.files.filter((f) => f.id !== fileId), updatedAt: Date.now() }
+              : p
+          ),
+        })),
 
       // Skills Actions
       setSkills: (skills) => set({ skills }),
@@ -471,13 +515,20 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'byte_store',
-      version: 1, // Store version for future migrations
+      version: 2,
       migrate: (persistedState: any, _version: number) => {
-        // Handle quick prompts migration
         if (persistedState) {
           const migratedQuickPrompts = migrateQuickPrompts(persistedState)
           if (migratedQuickPrompts !== persistedState.quickPrompts) {
             persistedState.quickPrompts = migratedQuickPrompts
+          }
+          // Migrate projects to add customInstructions and files
+          if (persistedState.projects) {
+            persistedState.projects = persistedState.projects.map((p: any) => ({
+              ...p,
+              customInstructions: p.customInstructions || '',
+              files: p.files || [],
+            }))
           }
         }
         return persistedState as any

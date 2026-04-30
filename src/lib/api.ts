@@ -348,7 +348,8 @@ export function streamChat(
   onError: (error: Error) => void,
   chatConfig?: ChatConfig,
   memories?: { id: string; name: string; content: string }[],
-  simplifiedSystemPrompt?: string | null
+  simplifiedSystemPrompt?: string | null,
+  extraContext?: string
 ): StreamHandle {
   let isAborted = false
 
@@ -361,7 +362,8 @@ export function streamChat(
   
   const config = chatConfig || getDefaultChatConfig()
   const useNativeSearch = config.enabledTools.includes('WEB_SEARCH') && model.capabilities?.webSearch
-  const systemPrompt = simplifiedSystemPrompt || assemblePrompt(config, memories, model).systemPrompt
+  const basePrompt = simplifiedSystemPrompt || assemblePrompt(config, memories, model).systemPrompt
+  const systemPrompt = extraContext ? `${extraContext}\n\n${basePrompt}` : basePrompt
 
   ;(async () => {
     try {
@@ -640,11 +642,13 @@ export async function sendChatMessage(
   signal?: AbortSignal,
   chatConfig?: ChatConfig,
   memories?: { id: string; name: string; content: string }[],
-  simplifiedSystemPrompt?: string | null
+  simplifiedSystemPrompt?: string | null,
+  extraContext?: string
 ): Promise<string> {
   const config = chatConfig || getDefaultChatConfig()
   const useNativeSearch = config.enabledTools.includes('WEB_SEARCH') && model.capabilities?.webSearch
-  const systemPrompt = simplifiedSystemPrompt || assemblePrompt(config, memories, model).systemPrompt
+  const basePrompt = simplifiedSystemPrompt || assemblePrompt(config, memories, model).systemPrompt
+  const systemPrompt = extraContext ? `${extraContext}\n\n${basePrompt}` : basePrompt
 
   if (provider.id === 'anthropic') {
     return sendAnthropicMessage(provider, model, messages, systemPrompt, signal, useNativeSearch)

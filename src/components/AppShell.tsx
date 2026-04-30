@@ -7,6 +7,7 @@ import { ChatView } from "./views/ChatView";
 import { ChatsListView } from "./views/ChatsListView";
 import { SettingsView } from "./views/SettingsView";
 import { ProjectsView } from "./views/ProjectsView";
+import { ProjectDetailView } from "./views/ProjectDetailView";
 import { CouncilView } from "./views/CouncilView";
 import { CustomizeView } from "./views/CustomizeView";
 import { NewChatView } from "./views/NewChatView";
@@ -220,6 +221,8 @@ export function AppShell() {
         return <SettingsView />;
       case "projects":
         return <ProjectsView />;
+      case "project-detail":
+        return <ProjectDetailView />;
       case "council":
         return <CouncilView />;
       case "customize":

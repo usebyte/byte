@@ -3,18 +3,28 @@ import { useStore } from '../../store/useStore'
 import { ByteLogo } from '../shared/ByteLogo'
 
 export function SidebarHeader() {
-  const { setActiveView } = useStore()
+  const { setActiveView, setActiveProjectId } = useStore()
+
+  const goHome = () => {
+    setActiveProjectId(null)
+    setActiveView('home')
+  }
+
+  const startNewChat = () => {
+    setActiveProjectId(null)
+    setActiveView('home')
+  }
 
   return (
     <div className="sb-head">
-      <div className="sb-brand" onClick={() => setActiveView('home')}>
+      <div className="sb-brand" onClick={goHome}>
         <ByteLogo size={18} />
         <span className="sb-brand-name">Byte</span>
       </div>
 
       <button
         id="nav-newchat"
-        onClick={() => setActiveView('home')}
+        onClick={startNewChat}
         className="sb-newchat"
         title="New chat"
       >

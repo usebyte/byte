@@ -3,12 +3,11 @@ import { createPortal } from 'react-dom'
 import {
   Plus, Paperclip, Camera, Folder, BookOpen, Zap, Search, Pen, ChevronRight, Check, X, Brain, Info,
 } from 'lucide-react'
-import type { ResponseStyleId } from '../../types'
+import type { ResponseStyleId, Project } from '../../types'
 
 interface PlusMenuProps {
   onAddFiles: () => void
   onScreenshot: () => void
-  onAddToProject: () => void
   onSkills: () => void
   onAddConnectors: () => void
   onStyleChange: (style: ResponseStyleId) => void
@@ -21,6 +20,10 @@ interface PlusMenuProps {
   modelCanWebSearch?: boolean
   langSearchApiKey?: string
   onNavigateToConnections?: () => void
+  projects?: Project[]
+  activeChatId?: string | null
+  onAddChatToProject?: (projectId: string) => void
+  onRemoveChatFromProject?: (projectId: string, chatId: string) => void
 }
 
 // Menu position can use either top or bottom for vertical positioning
@@ -33,7 +36,6 @@ interface MenuPosition {
 export function PlusMenu({
   onAddFiles,
   onScreenshot,
-  onAddToProject,
   onSkills,
   onAddConnectors,
   onStyleChange,
@@ -46,9 +48,14 @@ export function PlusMenu({
   modelCanWebSearch = false,
   langSearchApiKey,
   onNavigateToConnections,
+  projects,
+  activeChatId,
+  onAddChatToProject,
+  onRemoveChatFromProject,
 }: PlusMenuProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showStyleSubmenu, setShowStyleSubmenu] = useState(false)
+  const [showProjectSubmenu, setShowProjectSubmenu] = useState(false)
   const [isStyleBtnHovered, setIsStyleBtnHovered] = useState(false)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
   const [menuPosition, setMenuPosition] = useState<MenuPosition>({ left: 0, top: 0 })
@@ -57,6 +64,8 @@ export function PlusMenu({
   const styleItemRef = useRef<HTMLButtonElement>(null)
   const styleSubmenuRef = useRef<HTMLDivElement>(null)
   const styleIndicatorRef = useRef<HTMLButtonElement>(null)
+  const projectItemRef = useRef<HTMLButtonElement>(null)
+  const projectSubmenuRef = useRef<HTMLDivElement>(null)
 
   // Handle click outside to close menu
   useEffect(() => {
@@ -66,18 +75,21 @@ export function PlusMenu({
       const isOutsideBtn = btnRef.current && !btnRef.current.contains(target)
       const isOutsideStyleIndicator = styleIndicatorRef.current && !styleIndicatorRef.current.contains(target)
       const isOutsideStyleSubmenu = styleSubmenuRef.current && !styleSubmenuRef.current.contains(target)
+      const isOutsideProjectSubmenu = projectSubmenuRef.current && !projectSubmenuRef.current.contains(target)
+      const isOutsideProjectItem = projectItemRef.current && !projectItemRef.current.contains(target)
       
-      if (isOutsideDropdown && isOutsideBtn && isOutsideStyleIndicator && isOutsideStyleSubmenu) {
+      if (isOutsideDropdown && isOutsideBtn && isOutsideStyleIndicator && isOutsideStyleSubmenu && isOutsideProjectSubmenu && isOutsideProjectItem) {
         setShowMenu(false)
         setShowStyleSubmenu(false)
+        setShowProjectSubmenu(false)
         btnRef.current?.classList.remove('open')
       }
     }
-    if (showMenu || showStyleSubmenu) {
+    if (showMenu || showStyleSubmenu || showProjectSubmenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showMenu, showStyleSubmenu])
+  }, [showMenu, showStyleSubmenu, showProjectSubmenu])
 
   // Calculate position when showing menu - useLayoutEffect for synchronous DOM updates
   useLayoutEffect(() => {
@@ -260,6 +272,94 @@ export function PlusMenu({
     )
   }
 
+  // Render project submenu
+  const renderProjectSubmenu = () => {
+    if (!showProjectSubmenu) return null
+
+    const activeProjects = (projects || []).filter((p) => p.status === 'active')
+
+    return (
+      <div
+        ref={projectSubmenuRef}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: '100%',
+          marginLeft: 0,
+          background: 'var(--sf)',
+          border: '1px solid var(--bd2)',
+          borderRadius: 'var(--r)',
+          padding: '4px',
+          minWidth: 160,
+          maxHeight: 110,
+          overflowY: 'auto',
+          boxShadow: '0 6px 24px rgba(0,0,0,.14), 0 1px 4px rgba(0,0,0,.08)',
+          animation: 'dropDown 0.12s ease',
+          zIndex: 951,
+        }}
+        onMouseEnter={() => setShowProjectSubmenu(true)}
+        onMouseLeave={() => setShowProjectSubmenu(false)}
+      >
+        {activeProjects.length === 0 ? (
+          <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--tx4)', textAlign: 'center' }}>
+            No active projects
+          </div>
+        ) : (
+          activeProjects.map((project) => {
+            const isInProject = activeChatId ? project.chatIds.includes(activeChatId) : false
+            return (
+              <button
+                key={project.id}
+                onClick={() => {
+                  if (isInProject) {
+                    onRemoveChatFromProject?.(project.id, activeChatId!)
+                  } else {
+                    onAddChatToProject?.(project.id)
+                  }
+                  setShowProjectSubmenu(false)
+                  setShowMenu(false)
+                  btnRef.current?.classList.remove('open')
+                }}
+                className="pm-item"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '6px 9px',
+                  borderRadius: 'var(--r-sm)',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font)',
+                  fontSize: 12,
+                  color: 'var(--tx2)',
+                  textAlign: 'left',
+                  transition: 'background 0.1s, color 0.1s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(var(--acc-r),var(--acc-g),var(--acc-b),.09)'
+                  e.currentTarget.style.color = 'var(--tx)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = 'var(--tx2)'
+                }}
+              >
+                <span style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: project.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Folder size={8} color="white" />
+                </span>
+                <span style={{ flex: 1 }}>{project.name}</span>
+                {isInProject && <X size={10} style={{ color: 'var(--tx4)' }} />}
+                {!isInProject && <Plus size={10} style={{ color: 'var(--tx4)' }} />}
+              </button>
+            )
+          })
+        )}
+      </div>
+    )
+  }
+
   // Render the dropdown menu using a portal to avoid transform containment issues
   const renderDropdown = () => {
     if (!showMenu) return null
@@ -284,7 +384,44 @@ export function PlusMenu({
       >
         <MenuItem icon={Paperclip} label="Add files or photos" onClick={() => { onAddFiles(); setShowMenu(false) }} />
         <MenuItem icon={Camera} label="Take a screenshot" onClick={() => { onScreenshot(); setShowMenu(false) }} />
-        <MenuItem icon={Folder} label="Add to project" onClick={() => { onAddToProject(); setShowMenu(false) }} hasArrow />
+        <div
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setShowProjectSubmenu(true)}
+            onMouseLeave={() => setShowProjectSubmenu(false)}
+          >
+            <button
+              ref={projectItemRef}
+              className="pm-item"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '6px 9px',
+                borderRadius: 'var(--r-sm)',
+                border: 'none',
+                background: showProjectSubmenu ? 'rgba(var(--acc-r),var(--acc-g),var(--acc-b),.09)' : 'transparent',
+                cursor: 'pointer',
+                fontFamily: 'var(--font)',
+                fontSize: 12,
+                color: 'var(--tx2)',
+                textAlign: 'left',
+                transition: 'background 0.1s, color 0.1s',
+              }}
+            >
+              <span className="pm-icon" style={{
+                width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, color: 'var(--tx3)',
+              }}>
+                <Folder size={14} />
+              </span>
+              <span className="pm-label" style={{ flex: 1 }}>Add to project</span>
+              <span className="pm-arrow" style={{ color: 'var(--tx4)', flexShrink: 0 }}>
+                <ChevronRight size={10} />
+              </span>
+            </button>
+            {renderProjectSubmenu()}
+          </div>
 
         <Divider />
 
@@ -427,7 +564,7 @@ export function PlusMenu({
   const showStyleIndicator = currentStyle !== 'normal'
 
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
       <button
         ref={btnRef}
         className="t-btn plus-btn"

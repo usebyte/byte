@@ -77,7 +77,7 @@ export type ThemeId =
 
 export type LayoutMode = 'full' | 'icons' | 'none';
 
-export type ActiveView = 'home' | 'chats' | 'settings' | 'chat' | 'new-chat' | 'projects' | 'council' | 'customize' | 'sparks' | 'agents';
+export type ActiveView = 'home' | 'chats' | 'settings' | 'chat' | 'new-chat' | 'projects' | 'project-detail' | 'council' | 'customize' | 'sparks' | 'agents';
 
 export interface StreamHandle {
   abort: () => void;
@@ -119,6 +119,15 @@ export interface SuggestMemoryPayload {
   content: string;
 }
 
+export interface ProjectFile {
+  id: string;
+  name: string;
+  path: string;
+  type: string;
+  size: number;
+  addedAt: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -128,7 +137,9 @@ export interface Project {
   status: 'active' | 'archived';
   createdAt: number;
   updatedAt: number;
-  chatIds: string[]; // Associated chat IDs
+  chatIds: string[];
+  customInstructions: string;
+  files: ProjectFile[];
 }
 
 export interface Skill {

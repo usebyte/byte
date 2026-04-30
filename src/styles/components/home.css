@@ -253,7 +253,7 @@
 #ta::placeholder,.small-ta::placeholder,.byte-ta::placeholder{color:var(--tx4)}
 .small-ta{flex:1;background:transparent;border:none;outline:none;font-family:var(--font);font-size:var(--fs);color:var(--tx);line-height:1.65;resize:none;min-height:28px;max-height:140px;overflow-y:auto}
 .in-row-bottom{display:flex;align-items:center;justify-content:space-between}
-.in-tools{display:flex;gap:2px}
+.in-tools{display:flex;gap:6px}
 .t-btn{width:27px;height:27px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;color:var(--tx3);transition:all var(--ease)}
 .t-btn:hover{background:rgba(var(--acc-r),var(--acc-g),var(--acc-b),.09);color:var(--tx2)}
 .in-right{display:flex;align-items:center;gap:6px}

@@ -13,13 +13,33 @@ interface ChatViewProps {
 }
 
 export function ChatView({ onAskQuestionDetected, activeAskQuestion, activeSuggestMemory }: ChatViewProps) {
-  const { chats, activeChatId, updateChat, providers, selectedModelId, enabledModelIds, streamingEnabled, memories, langSearchApiKey, setDefaultWebSearchEnabled } = useStore()
+  const { chats, activeChatId, updateChat, providers, selectedModelId, enabledModelIds, streamingEnabled, memories, langSearchApiKey, setDefaultWebSearchEnabled, projects } = useStore()
   const [isLoading, setIsLoading] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const streamAbortRef = useRef<(() => void) | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isSearchingRef = useRef(false)
   const chat = chats.find((c) => c.id === activeChatId)
+
+  // Build project context for AI prompts
+  const getProjectContext = useCallback(() => {
+    if (!activeChatId) return undefined
+    const project = projects.find((p) => p.chatIds.includes(activeChatId))
+    if (!project) return undefined
+    const parts: string[] = []
+    if (project.customInstructions) {
+      parts.push(`<project_context>\n<project_name>${project.name}</project_name>`)
+      parts.push(`<custom_instructions>\n${project.customInstructions}\n</custom_instructions>`)
+    }
+    if (project.files.length > 0) {
+      parts.push(`<project_files>\n${project.files.map((f) => `- ${f.name} (${(f.size / 1024).toFixed(1)} KB)`).join('\n')}\n</project_files>`)
+    }
+    if (parts.length > 0) {
+      parts.push('</project_context>')
+      return parts.join('\n')
+    }
+    return undefined
+  }, [activeChatId, projects])
 
   // Get enabled models for fallback
   const enabledModels = providers.flatMap(p => p.models.filter(m => enabledModelIds.includes(m.id)))
@@ -268,12 +288,13 @@ export function ChatView({ onAskQuestionDetected, activeAskQuestion, activeSugge
           },
           freshChat.config,
           memories,
-          undefined
+          undefined,
+          getProjectContext()
         )
         streamAbortRef.current = handle.abort
       } else {
         const response = await sendChatMessage(
-          provider, model, withSearchResults, undefined, freshChat.config, memories, undefined
+          provider, model, withSearchResults, undefined, freshChat.config, memories, undefined, getProjectContext()
         )
         const freshChat2 = useStore.getState().chats.find((c) => c.id === chatId)
         const existingMsg = freshChat2?.messages.find(m => m.id === toolMsgId)
@@ -422,6 +443,8 @@ export function ChatView({ onAskQuestionDetected, activeAskQuestion, activeSugge
         },
         currentChat.config,
         memories,
+        undefined,
+        getProjectContext(),
       )
       streamAbortRef.current = handle.abort
     } else {
@@ -434,7 +457,8 @@ export function ChatView({ onAskQuestionDetected, activeAskQuestion, activeSugge
           abortControllerRef.current.signal,
           currentChat.config,
           memories,
-          undefined // No simplified prompt for continue (not a slash command)
+          undefined, // No simplified prompt for continue (not a slash command)
+          getProjectContext()
         )
 
         const updatedMessages = [...currentChat.messages, { ...assistantMsg, content: response, status: 'done' as const }]
@@ -780,7 +804,8 @@ export function ChatView({ onAskQuestionDetected, activeAskQuestion, activeSugge
         },
         chat?.config, // Pass chat config for prompt assembly
         memories, // Pass memories for context
-        simplifiedSystemPrompt // Use simplified prompt for slash commands (null for normal messages)
+        simplifiedSystemPrompt, // Use simplified prompt for slash commands (null for normal messages)
+        getProjectContext()
       )
       streamAbortRef.current = handle.abort
     } else {
@@ -794,7 +819,8 @@ export function ChatView({ onAskQuestionDetected, activeAskQuestion, activeSugge
           abortControllerRef.current.signal,
           chat?.config, // Pass chat config for prompt assembly
           memories, // Pass memories for context
-          simplifiedSystemPrompt // Use simplified prompt for slash commands (null for normal messages)
+          simplifiedSystemPrompt, // Use simplified prompt for slash commands (null for normal messages)
+          getProjectContext()
         )
 
         const askQuestion = parseAskQuestionTool(response)

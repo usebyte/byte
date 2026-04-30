@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { Mic, Send, ChevronDown, Square } from 'lucide-react'
+import { Mic, Send, ChevronDown, Square, Folder, X } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { getDisplayName } from '../../lib/api'
 import { PlusMenu } from './PlusMenu'
@@ -25,14 +25,14 @@ interface InputBoxProps {
 
 export function InputBox({ variant, onSend, isStreaming, onStop, value: externalValue, onChange, responseStyle = 'normal', onStyleChange, memoryEnabled = false, onMemoryToggle, webSearchEnabled: extWebSearchEnabled, onWebSearchToggle }: InputBoxProps) {
   const [internalValue, setInternalValue] = useState('')
-  const [localWebSearch, setLocalWebSearch] = useState(false)
   const [isModelPickerOpen, setIsModelPickerOpen] = useState(false)
   const [showSlashMenu, setShowSlashMenu] = useState(false)
   const [slashQuery, setSlashQuery] = useState('')
+  const [localWebSearch, setLocalWebSearch] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelChipRef = useRef<HTMLButtonElement>(null)
-  const { selectedModelId, providers, enabledModelIds, langSearchApiKey } = useStore()
+  const { selectedModelId, providers, enabledModelIds, langSearchApiKey, projects, activeChatId, addChatToProject, removeChatFromProject, newChat } = useStore()
   const navigateToConnections = () => {
     useStore.getState().setSettingsSection('connections')
     useStore.getState().setActiveView('settings')
@@ -107,12 +107,26 @@ export function InputBox({ variant, onSend, isStreaming, onStop, value: external
   }
 
   const handleScreenshot = () => {}
-  const handleAddToProject = () => {}
   const handleSkills = () => {}
   const handleAddConnectors = () => {}
+  const handleAddChatToProject = (projectId: string) => {
+    if (activeChatId) {
+      addChatToProject(projectId, activeChatId)
+    } else {
+      const chatId = newChat()
+      addChatToProject(projectId, chatId)
+    }
+  }
   const handleStyleChange = (style: ResponseStyleId) => {
     onStyleChange?.(style)
   }
+
+  const [isProjectHovered, setIsProjectHovered] = useState(false)
+
+  const activeProject = useMemo(() => {
+    if (!activeChatId) return null
+    return projects.find((p) => p.chatIds.includes(activeChatId)) || null
+  }, [activeChatId, projects])
 
   const hasText = text.trim().length > 0
   const webSearchEnabled = extWebSearchEnabled !== undefined ? extWebSearchEnabled : localWebSearch
@@ -151,7 +165,6 @@ export function InputBox({ variant, onSend, isStreaming, onStop, value: external
             <PlusMenu
               onAddFiles={handleAddFiles}
               onScreenshot={handleScreenshot}
-              onAddToProject={handleAddToProject}
               onSkills={handleSkills}
               onAddConnectors={handleAddConnectors}
               onStyleChange={handleStyleChange}
@@ -164,7 +177,42 @@ export function InputBox({ variant, onSend, isStreaming, onStop, value: external
               modelCanWebSearch={modelCanWebSearch}
               langSearchApiKey={langSearchApiKey}
               onNavigateToConnections={navigateToConnections}
+              projects={projects}
+              activeChatId={activeChatId}
+              onAddChatToProject={handleAddChatToProject}
+              onRemoveChatFromProject={removeChatFromProject}
             />
+            {activeProject && (
+              <button
+                className="t-btn"
+                title={isProjectHovered ? 'Remove from project' : `Project: ${activeProject.name}`}
+                onMouseEnter={() => setIsProjectHovered(true)}
+                onMouseLeave={() => setIsProjectHovered(false)}
+                onClick={() => {
+                  if (activeChatId) {
+                    removeChatFromProject(activeProject.id, activeChatId)
+                  }
+                  setIsProjectHovered(false)
+                }}
+                style={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 'var(--r-sm)',
+                  border: 'none',
+                  background: isProjectHovered
+                    ? 'rgba(var(--acc-r),var(--acc-g),var(--acc-b),.15)'
+                    : activeProject.color + '22',
+                  cursor: 'pointer',
+                  color: isProjectHovered ? 'var(--tx)' : activeProject.color,
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                {isProjectHovered ? <X size={14} /> : <Folder size={14} />}
+              </button>
+            )}
           </div>
           <div className="in-right">
             {model && (
