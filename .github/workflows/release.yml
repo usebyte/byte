@@ -19,12 +19,6 @@ jobs:
             bundle-path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             updater-id: darwin-aarch64
 
-          - platform: macos-13
-            target: x86_64-apple-darwin
-            bundle: Byte_x64.dmg
-            bundle-path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
-            updater-id: darwin-x86_64
-
           - platform: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             bundle: byte_amd64.AppImage
@@ -188,7 +182,6 @@ jobs:
           SIG_WIN=$(get_sig "windows-x86_64")
           SIG_LINUX=$(get_sig "linux-x86_64")
           SIG_MAC_ARM=$(get_sig "darwin-aarch64")
-          SIG_MAC_X64=$(get_sig "darwin-x86_64")
 
           cat <<MANIFEST > update.json
           {
@@ -207,10 +200,6 @@ jobs:
               "darwin-aarch64": {
                 "signature": "$SIG_MAC_ARM",
                 "url": "$BASE/Byte_aarch64-apple-darwin.app.tar.gz"
-              },
-              "darwin-x86_64": {
-                "signature": "$SIG_MAC_X64",
-                "url": "$BASE/Byte_x86_64-apple-darwin.app.tar.gz"
               }
             }
           }
@@ -224,7 +213,6 @@ jobs:
           BASE="https://github.com/${{ github.repository }}/releases/download/$TAG"
 
           ARM_SHA=$(cat "sigs/darwin-aarch64.dmg.sha256" 2>/dev/null || echo "")
-          INTEL_SHA=$(cat "sigs/darwin-x86_64.dmg.sha256" 2>/dev/null || echo "")
 
           if [ -z "$ARM_SHA" ]; then
             echo "No ARM DMG checksum found, skipping Homebrew formula"
@@ -233,14 +221,8 @@ jobs:
 
           { echo 'cask "byte" do'
             echo "  version \"$VERSION\""
-            echo ""
-            echo "  if Hardware::CPU.arm?"
-            echo "    sha256 \"$ARM_SHA\""
-            echo "    url \"$BASE/Byte_aarch64.dmg\""
-            echo "  else"
-            echo "    sha256 \"${INTEL_SHA:-$ARM_SHA}\""
-            echo "    url \"$BASE/Byte_x64.dmg\""
-            echo "  end"
+            echo "  sha256 \"$ARM_SHA\""
+            echo "  url \"$BASE/Byte_aarch64.dmg\""
             echo ""
             echo "  name \"Byte\""
             echo "  desc \"AI assistant for your desktop\""
