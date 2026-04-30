@@ -87,7 +87,11 @@ jobs:
             UPDATER_SRC=$(ls "$UPDATER_DIR/"*.msi.zip 2>/dev/null | head -n 1) || true
             if [ -z "$UPDATER_SRC" ] && [ -f "$INSTALLER" ]; then
               echo "Creating $UPDATER_NAME from MSI..."
-              (cd "$(dirname "$INSTALLER")" && zip -q "$UPDATER_NAME" "$(basename "$INSTALLER")") || true
+              if command -v zip &>/dev/null; then
+                (cd "$(dirname "$INSTALLER")" && zip -q "$UPDATER_NAME" "$(basename "$INSTALLER")")
+              else
+                (cd "$(dirname "$INSTALLER")" && 7z a -tzip "$UPDATER_NAME" "$(basename "$INSTALLER")" >/dev/null)
+              fi
               UPDATER_SRC="$UPDATER_DIR/$UPDATER_NAME"
             fi
           elif [[ "${{ matrix.platform }}" == "ubuntu-latest" ]]; then
@@ -130,7 +134,13 @@ jobs:
 
           # Save DMG checksum for Homebrew formula
           if [ -f "$INSTALLER" ]; then
-            shasum -a 256 "$INSTALLER" | awk '{print $1}' > "artifacts/${{ matrix.updater-id }}.dmg.sha256"
+            if command -v shasum &>/dev/null; then
+              shasum -a 256 "$INSTALLER" | awk '{print $1}'
+            elif command -v sha256sum &>/dev/null; then
+              sha256sum "$INSTALLER" | awk '{print $1}'
+            else
+              certutil -hashfile "$INSTALLER" SHA256 | awk 'NR==2{print tolower($1)}'
+            fi > "artifacts/${{ matrix.updater-id }}.dmg.sha256"
           fi
 
       - name: Upload to Release
