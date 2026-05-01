@@ -58,29 +58,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
-      - name: Build
-        run: npm run tauri build -- --target ${{ matrix.target }} --no-sign
-
-      - name: Ad-hoc sign macOS app
+      - name: Build (macOS — Apple Development signed)
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          APP="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Byte.app"
-          DMG_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/dmg"
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEV_CERT }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: npm run tauri build -- --target ${{ matrix.target }}
 
-          echo "=== Ad-hoc signing app ==="
-          codesign --deep --force --sign - "$APP"
-          codesign -v "$APP" && echo "✅ App signed successfully"
-
-          echo "=== Rebuilding DMG from signed app ==="
-          rm -f "$DMG_DIR"/*.dmg
-          hdiutil create \
-            -volname "Byte" \
-            -srcfolder "$APP" \
-            -ov \
-            -format UDZO \
-            "$DMG_DIR/Byte_aarch64.dmg"
-          echo "✅ DMG rebuilt"
+      - name: Build (Linux / Windows)
+        if: runner.os != 'macOS'
+        run: npm run tauri build -- --target ${{ matrix.target }} --no-sign
 
       - name: Capture Artifacts
         shell: bash
