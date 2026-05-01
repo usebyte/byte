@@ -36,6 +36,7 @@ export function AppShell() {
   const [updateAvailable, setUpdateAvailable] = useState<{
     version: string;
     installing: boolean;
+    installed: boolean;
   } | null>(null);
   const [activeAskQuestion, setActiveAskQuestion] =
     useState<AskQuestionPayload | null>(null);
@@ -62,20 +63,11 @@ export function AppShell() {
         const { check } = await import("@tauri-apps/plugin-updater");
         const update = await check();
         if (update?.version && update.version !== "0.1.0") {
-          const isMac = navigator.userAgent.toLowerCase().includes("mac");
-          if (isMac) {
-            setUpdateAvailable({ version: update.version, installing: false });
-          } else {
-            setUpdateAvailable({ version: update.version, installing: true });
-            try {
-              await update.downloadAndInstall();
-              const { relaunch } = await import("@tauri-apps/plugin-process");
-              await relaunch();
-            } catch (error) {
-              console.error("Failed to install update:", error);
-              setUpdateAvailable({ version: update.version, installing: false });
-            }
-          }
+          setUpdateAvailable({
+            version: update.version,
+            installing: false,
+            installed: false,
+          });
         }
       } catch {
         // not in Tauri or updater unavailable
@@ -103,19 +95,29 @@ export function AppShell() {
       return;
     }
 
-    setUpdateAvailable({ ...updateAvailable, installing: true });
+    setUpdateAvailable({
+      ...updateAvailable,
+      installing: true,
+      installed: false,
+    });
     try {
       const { check } = await import("@tauri-apps/plugin-updater");
       const update = await check();
       if (update) {
         await update.downloadAndInstall();
-        // After install, relaunch the app
-        const { relaunch } = await import("@tauri-apps/plugin-process");
-        await relaunch();
+        setUpdateAvailable({
+          version: updateAvailable.version,
+          installing: false,
+          installed: true,
+        });
       }
     } catch (error) {
       console.error("Failed to install update:", error);
-      setUpdateAvailable({ ...updateAvailable, installing: false });
+      setUpdateAvailable({
+        ...updateAvailable,
+        installing: false,
+        installed: false,
+      });
     }
   };
 
@@ -264,9 +266,11 @@ export function AppShell() {
             >
               {updateAvailable.installing
                 ? "Installing..."
-                : navigator.userAgent.toLowerCase().includes("mac")
-                  ? "Download Update"
-                  : "Install & Restart"}
+                : updateAvailable.installed
+                  ? "Restart to apply"
+                  : navigator.userAgent.toLowerCase().includes("mac")
+                    ? "Download Update"
+                    : "Install Update"}
             </button>
             <button
               className="upd-dismiss"

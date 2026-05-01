@@ -70,7 +70,6 @@ fn list_project_files(app: tauri::AppHandle, project_id: String) -> Result<Vec<S
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(if cfg!(debug_assertions) {
