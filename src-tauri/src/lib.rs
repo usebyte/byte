@@ -21,8 +21,7 @@ fn save_project_file(
     let dir = get_project_dir(&app, &project_id);
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create directory: {}", e))?;
     let file_path = dir.join(&file_name);
-    fs::write(&file_path, &file_data)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    fs::write(&file_path, &file_data).map_err(|e| format!("Failed to write file: {}", e))?;
     Ok(file_path.to_string_lossy().to_string())
 }
 
@@ -49,10 +48,7 @@ fn delete_project_file(
 }
 
 #[tauri::command]
-fn list_project_files(
-    app: tauri::AppHandle,
-    project_id: String,
-) -> Result<Vec<String>, String> {
+fn list_project_files(app: tauri::AppHandle, project_id: String) -> Result<Vec<String>, String> {
     let dir = get_project_dir(&app, &project_id);
     if !dir.exists() {
         return Ok(vec![]);
@@ -74,6 +70,7 @@ fn list_project_files(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(if cfg!(debug_assertions) {

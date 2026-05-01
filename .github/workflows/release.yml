@@ -58,56 +58,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
-      - name: Import Apple Development Certificate
-        if: runner.os == 'macOS'
-        shell: bash
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEV_CERT }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
-        run: |
-          CERT_PATH="$RUNNER_TEMP/byte_dev_cert.p12"
-          KEYCHAIN_PATH="$RUNNER_TEMP/byte-signing.keychain-db"
-          KEYCHAIN_PASSWORD="temp-keychain-password"
-
-          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
-
-          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-
-          security import "$CERT_PATH" \
-            -k "$KEYCHAIN_PATH" \
-            -P "$APPLE_CERTIFICATE_PASSWORD" \
-            -A \
-            -T /usr/bin/codesign \
-            -T /usr/bin/security
-
-          security set-key-partition-list \
-            -S "apple-tool:,apple:,codesign:" \
-            -s \
-            -k "$KEYCHAIN_PASSWORD" \
-            "$KEYCHAIN_PATH"
-
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-          security default-keychain -s "$KEYCHAIN_PATH"
-
-          echo "=== Identities available for signing ==="
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
-          echo "✅ Certificate imported"
-
-      - name: Build (macOS — Apple Development signed)
-        if: runner.os == 'macOS'
-        shell: bash
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEV_CERT }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEV_CERT_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: npm run tauri build -- --target ${{ matrix.target }}
-
-      - name: Build (Linux / Windows)
-        if: runner.os != 'macOS'
+      - name: Build
         run: npm run tauri build -- --target ${{ matrix.target }} --no-sign
+
+      - name: Ad-hoc sign macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          APP="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Byte.app"
+          DMG_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/dmg"
+
+          echo "=== Ad-hoc signing app ==="
+          codesign --deep --force --sign - "$APP"
+          codesign -v "$APP" && echo "✅ App signed successfully"
+
+          echo "=== Rebuilding DMG from signed app ==="
+          rm -f "$DMG_DIR"/*.dmg
+          hdiutil create \
+            -volname "Byte" \
+            -srcfolder "$APP" \
+            -ov \
+            -format UDZO \
+            "$DMG_DIR/Byte_aarch64.dmg"
+          echo "✅ DMG rebuilt"
 
       - name: Capture Artifacts
         shell: bash
