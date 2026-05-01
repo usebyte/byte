@@ -135,7 +135,10 @@ jobs:
           # Sign the updater archive if no .sig file exists yet
           if [ -f "$UPDATER_SRC" ] && [ ! -f "$UPDATER_SRC.sig" ] && [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             echo "Signing updater archive..."
-            npx tauri signer sign "$UPDATER_SRC" > "$UPDATER_SRC.sig"
+            # Strip newlines from the key — GitHub secrets can inject a trailing \n
+            # which breaks base64 decoding inside the Tauri signer.
+            CLEAN_KEY=$(echo "$TAURI_SIGNING_PRIVATE_KEY" | tr -d '\n')
+            TAURI_SIGNING_PRIVATE_KEY="$CLEAN_KEY" npx tauri signer sign "$UPDATER_SRC" > "$UPDATER_SRC.sig"
           fi
 
           # Copy updater artifacts to artifacts/
