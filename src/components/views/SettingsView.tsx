@@ -37,6 +37,7 @@ const AVAILABLE_PROVIDERS = [
   { id: "aleph-alpha", name: "Aleph Alpha" },
   { id: "ollama", name: "Local (Ollama)" },
   { id: "lmstudio", name: "Local (LM Studio)" },
+  { id: "cerebras", name: "Cerebras" },
 ];
 
 export function SettingsView() {
@@ -210,6 +211,7 @@ function ProviderModal({
     "aleph-alpha": "https://api.aleph-alpha.com/v1",
     ollama: "http://localhost:11434/v1",
     lmstudio: "http://localhost:1234/v1",
+    cerebras: "https://api.cerebras.ai/v1",
   };
 
   const handleAdd = async () => {

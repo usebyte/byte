@@ -1,80 +1,112 @@
-import type { Provider, Model, Message, StreamHandle, ChatConfig } from '../types'
-import { assemblePrompt, getDefaultChatConfig } from './prompts'
+import type {
+  Provider,
+  Model,
+  Message,
+  StreamHandle,
+  ChatConfig,
+} from "../types";
+import { assemblePrompt, getDefaultChatConfig } from "./prompts";
 
-export function formatModelName(modelId: string): { displayName: string; organizationName: string } {
-  let displayName = modelId
-  let organizationName = ''
-  
+export function formatModelName(modelId: string): {
+  displayName: string;
+  organizationName: string;
+} {
+  let displayName = modelId;
+  let organizationName = "";
+
   // Handle Fireworks format: "accounts/fireworks/models/model-name"
-  if (modelId.startsWith('accounts/fireworks/models/')) {
-    organizationName = 'Fireworks'
-    displayName = modelId.replace('accounts/fireworks/models/', '')
-    displayName = displayName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-  } else if (modelId.includes('/')) {
+  if (modelId.startsWith("accounts/fireworks/models/")) {
+    organizationName = "Fireworks";
+    displayName = modelId.replace("accounts/fireworks/models/", "");
+    displayName = displayName
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  } else if (modelId.includes("/")) {
     // Format: "organization/model-name" -> displayName and organizationName separated
-    const parts = modelId.split('/')
-    const lastPart = parts[parts.length - 1]
-    organizationName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
-    displayName = lastPart.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-  } else if (modelId.includes(':')) {
+    const parts = modelId.split("/");
+    const lastPart = parts[parts.length - 1];
+    organizationName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    displayName = lastPart
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  } else if (modelId.includes(":")) {
     // Format: "provider:model-name" -> "Model Name"
-    displayName = modelId.split(':')[1]
-    displayName = displayName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+    displayName = modelId.split(":")[1];
+    displayName = displayName
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   } else {
     // Just capitalize and format
-    displayName = displayName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+    displayName = displayName
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   }
-  
-  return { displayName, organizationName }
+
+  return { displayName, organizationName };
 }
 
 export function getDisplayName(modelId: string): string {
-  const { displayName, organizationName } = formatModelName(modelId)
+  const { displayName, organizationName } = formatModelName(modelId);
   // Format as "Provider: Model Name"
-  return organizationName ? `${organizationName}: ${displayName}` : displayName
+  return organizationName ? `${organizationName}: ${displayName}` : displayName;
 }
 
-export function modelHasNativeWebSearch(providerId: string, modelId: string): boolean {
-  if (providerId === 'perplexity') return true
-  if (providerId === 'google') return true
-  if (providerId === 'openrouter') return true
-  if (providerId === 'anthropic') {
-    const id = modelId.toLowerCase()
-    return /claude-(opus|sonnet|haiku)?-?4/.test(id) || id.includes('claude-3-5')
+export function modelHasNativeWebSearch(
+  providerId: string,
+  modelId: string,
+): boolean {
+  if (providerId === "perplexity") return true;
+  if (providerId === "google") return true;
+  if (providerId === "openrouter") return true;
+  if (providerId === "anthropic") {
+    const id = modelId.toLowerCase();
+    return (
+      /claude-(opus|sonnet|haiku)?-?4/.test(id) || id.includes("claude-3-5")
+    );
   }
-  if (providerId === 'openai') {
-    const id = modelId.toLowerCase()
-    return id.includes('search-preview') || id.includes('search-api')
+  if (providerId === "openai") {
+    const id = modelId.toLowerCase();
+    return id.includes("search-preview") || id.includes("search-api");
   }
-  if (providerId === 'groq') {
-    return modelId === 'groq/compound' || modelId === 'groq/compound-mini'
+  if (providerId === "groq") {
+    return modelId === "groq/compound" || modelId === "groq/compound-mini";
   }
-  return false
+  return false;
 }
 
 export function formatContextWindow(contextWindow: number): string {
-  if (contextWindow >= 1000000) return `${Math.round(contextWindow / 1000000)}M`
-  if (contextWindow >= 1000) return `${Math.round(contextWindow / 1000)}K`
-  return contextWindow.toString()
+  if (contextWindow >= 1000000)
+    return `${Math.round(contextWindow / 1000000)}M`;
+  if (contextWindow >= 1000) return `${Math.round(contextWindow / 1000)}K`;
+  return contextWindow.toString();
 }
 
 export async function fetchModels(provider: Provider): Promise<Model[]> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
 
-  if (provider.id === 'anthropic') {
-    headers['x-api-key'] = provider.apiKey
-    headers['anthropic-version'] = '2023-06-01'
-  } else if (provider.id === 'google') {
+  if (provider.id === "anthropic") {
+    headers["x-api-key"] = provider.apiKey;
+    headers["anthropic-version"] = "2023-06-01";
+  } else if (provider.id === "google") {
     // Always use the correct endpoint regardless of stored baseUrl
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${provider.apiKey}`
-    const response = await fetch(url, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = (data.models || []).filter((m: any) =>
-      Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent')
-    )
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${provider.apiKey}`;
+    const response = await fetch(url, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = (data.models || []).filter(
+      (m: any) =>
+        Array.isArray(m.supportedGenerationMethods) &&
+        m.supportedGenerationMethods.includes("generateContent"),
+    );
     return modelsData.map((m: any) => {
-      const id = m.name?.replace('models/', '') || m.name
+      const id = m.name?.replace("models/", "") || m.name;
       return {
         id,
         name: m.displayName || getDisplayName(id),
@@ -82,14 +114,15 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         contextWindow: m.inputTokenLimit || 128000,
         enabled: false,
         capabilities: { webSearch: modelHasNativeWebSearch(provider.id, id) },
-      }
-    })
-  } else if (provider.id === 'groq') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.data || []
+      };
+    });
+  } else if (provider.id === "groq") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
     return modelsData.map((m: any) => ({
       id: m.id,
       name: getDisplayName(m.id),
@@ -97,15 +130,35 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       contextWindow: m.context_window || 128000,
       enabled: false,
       capabilities: { webSearch: modelHasNativeWebSearch(provider.id, m.id) },
-    }))
-  } else if (provider.id === 'huggingface') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/models?full=true`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = Array.isArray(data) ? data : data.models || []
+    }));
+  } else if (provider.id === "cerebras") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
+    return modelsData.map((m: any) => ({
+      id: m.id,
+      name: getDisplayName(m.id),
+      providerId: provider.id,
+      contextWindow: m.context_window || 128000,
+      enabled: false,
+      capabilities: { webSearch: false },
+    }));
+  } else if (provider.id === "huggingface") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models?full=true`, {
+      headers,
+    });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = Array.isArray(data) ? data : data.models || [];
     return modelsData
-      .filter((m: any) => m.id && !m.id.includes('/') || m.id.startsWith('meta-'))
+      .filter(
+        (m: any) => (m.id && !m.id.includes("/")) || m.id.startsWith("meta-"),
+      )
       .slice(0, 100)
       .map((m: any) => ({
         id: m.id,
@@ -114,15 +167,16 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         contextWindow: m.context_window || m.config?.context_length || 4096,
         enabled: false,
         capabilities: { webSearch: false },
-      }))
-  } else if (provider.id === 'cohere') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.models || []
+      }));
+  } else if (provider.id === "cohere") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.models || [];
     return modelsData
-      .filter((m: any) => m.type === 'chat' || m.id.startsWith('command'))
+      .filter((m: any) => m.type === "chat" || m.id.startsWith("command"))
       .map((m: any) => ({
         id: m.id,
         name: getDisplayName(m.id),
@@ -130,13 +184,14 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         contextWindow: m.context_window_size || m.context_window || 4096,
         enabled: false,
         capabilities: { webSearch: false },
-      }))
-  } else if (provider.id === 'perplexity') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.data || []
+      }));
+  } else if (provider.id === "perplexity") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
     return modelsData.map((m: any) => ({
       id: m.id,
       name: getDisplayName(m.id),
@@ -144,13 +199,14 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       contextWindow: m.context_window || 128000,
       enabled: false,
       capabilities: { webSearch: true },
-    }))
-  } else if (provider.id === 'together') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.data || []
+    }));
+  } else if (provider.id === "together") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
     return modelsData.map((m: any) => ({
       id: m.id,
       name: getDisplayName(m.id),
@@ -158,13 +214,16 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       contextWindow: m.context_window || m.context_length || 128000,
       enabled: false,
       capabilities: { webSearch: false },
-    }))
-  } else if (provider.id === 'replicate') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch('https://api.replicate.com/v1/models', { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.results || []
+    }));
+  } else if (provider.id === "replicate") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch("https://api.replicate.com/v1/models", {
+      headers,
+    });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.results || [];
     return modelsData.map((m: any) => ({
       id: m.version?.id || m.name,
       name: getDisplayName(m.name),
@@ -172,13 +231,14 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       contextWindow: m.version?.controller?.max_length || 4096,
       enabled: false,
       capabilities: { webSearch: false },
-    }))
-  } else if (provider.id === 'fireworks') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.data || []
+    }));
+  } else if (provider.id === "fireworks") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
     return modelsData.map((m: any) => ({
       id: m.id,
       name: getDisplayName(m.id),
@@ -186,13 +246,14 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       contextWindow: m.context_window || 128000,
       enabled: false,
       capabilities: { webSearch: false },
-    }))
-  } else if (provider.id === 'openrouter') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.data || []
+    }));
+  } else if (provider.id === "openrouter") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
     return modelsData.map((m: any) => ({
       id: m.id,
       name: m.name || getDisplayName(m.id),
@@ -200,37 +261,45 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       contextWindow: m.context_length || m.context_window || 128000,
       enabled: false,
       capabilities: { webSearch: true },
-    }))
-  } else if (provider.id === 'ollama' || provider.id === 'lmstudio') {
-    let modelsData: any[] = []
-    
-    const response = await fetch(`${provider.baseUrl}/models`, { headers })
+    }));
+  } else if (provider.id === "ollama" || provider.id === "lmstudio") {
+    let modelsData: any[] = [];
+
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
     if (response.ok) {
-      const data = await response.json()
-      modelsData = data.data || data.models || []
-    } else if (provider.id === 'ollama') {
-      const listResponse = await fetch('http://localhost:11434/api/tags', { headers })
-      if (!listResponse.ok) throw new Error(`Failed to fetch models: ${listResponse.statusText}`)
-      const listData = await listResponse.json()
-      modelsData = listData.models || []
+      const data = await response.json();
+      modelsData = data.data || data.models || [];
+    } else if (provider.id === "ollama") {
+      const listResponse = await fetch("http://localhost:11434/api/tags", {
+        headers,
+      });
+      if (!listResponse.ok)
+        throw new Error(`Failed to fetch models: ${listResponse.statusText}`);
+      const listData = await listResponse.json();
+      modelsData = listData.models || [];
     } else {
-      throw new Error(`Failed to fetch models: ${response.statusText}`)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
     }
-    
+
     return modelsData.map((m: any) => ({
       id: m.id || m.name,
-      name: m.name || getDisplayName(m.id || ''),
+      name: m.name || getDisplayName(m.id || ""),
       providerId: provider.id,
       contextWindow: m.context_window || m.context_length || 4096,
       enabled: false,
       capabilities: { webSearch: false },
-    }))
-  } else if (provider.id === 'mistral' || provider.id === 'aleph_alpha' || provider.id === 'modal') {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.data || []
+    }));
+  } else if (
+    provider.id === "mistral" ||
+    provider.id === "aleph_alpha" ||
+    provider.id === "modal"
+  ) {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
     return modelsData.map((m: any) => ({
       id: m.id,
       name: getDisplayName(m.id),
@@ -238,21 +307,24 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       contextWindow: m.context_window || m.context_length || 128000,
       enabled: false,
       capabilities: { webSearch: false },
-    }))
+    }));
   } else {
-    headers['Authorization'] = `Bearer ${provider.apiKey}`
-    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers })
-    if (!response.ok) throw new Error(`Failed to fetch models: ${response.statusText}`)
-    const data = await response.json()
-    const modelsData = data.data || []
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
     return modelsData.map((m: any) => {
-      let contextWindow = 128000
-      if (m.context_length) contextWindow = m.context_length
-      else if (m.top_provider?.context_length) contextWindow = m.top_provider.context_length
-      else if (m.context_window) contextWindow = m.context_window
-      else if (m.meta?.context_window) contextWindow = m.meta.context_window
-      else if (m.architecture?.max_tokens) contextWindow = m.architecture.max_tokens
-      else if (m.max_tokens) contextWindow = m.max_tokens
+      let contextWindow = 128000;
+      if (m.context_length) contextWindow = m.context_length;
+      else if (m.top_provider?.context_length)
+        contextWindow = m.top_provider.context_length;
+      else if (m.context_window) contextWindow = m.context_window;
+      else if (m.meta?.context_window) contextWindow = m.meta.context_window;
+      else if (m.architecture?.max_tokens)
+        contextWindow = m.architecture.max_tokens;
+      else if (m.max_tokens) contextWindow = m.max_tokens;
       return {
         id: m.id,
         name: getDisplayName(m.id),
@@ -260,11 +332,11 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         contextWindow,
         enabled: false,
         capabilities: { webSearch: modelHasNativeWebSearch(provider.id, m.id) },
-      }
-    })
+      };
+    });
   }
 
-  return []
+  return [];
 }
 
 async function streamGroq(
@@ -276,66 +348,76 @@ async function streamGroq(
   onDone: () => void,
   _onError: (error: Error) => void,
   controller: AbortController,
-  _useNativeSearch: boolean = false
+  _useNativeSearch: boolean = false,
 ) {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${provider.apiKey}`,
-  }
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${provider.apiKey}`,
+  };
 
-  const apiMessages: Array<{ role: string; content: string }> = []
+  const apiMessages: Array<{ role: string; content: string }> = [];
 
   if (systemPrompt) {
-    apiMessages.push({ role: 'system', content: systemPrompt })
+    apiMessages.push({ role: "system", content: systemPrompt });
   }
 
-  apiMessages.push(...messages.map((m) => ({ role: m.role, content: m.content })))
+  apiMessages.push(
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  );
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: model.id,
-      messages: apiMessages,
-      stream: true,
-    }),
-    signal: controller.signal,
-  })
+  const response = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: model.id,
+        messages: apiMessages,
+        stream: true,
+      }),
+      signal: controller.signal,
+    },
+  );
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`API error: ${response.status} ${error}`);
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('No response body')
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
 
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const decoder = new TextDecoder();
+  let buffer = "";
 
   try {
     while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+      const { done, value } = await reader.read();
+      if (done) break;
 
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (!line.trim() || !line.startsWith('data: ')) continue
-        const data = line.slice(6).trim()
-        if (data === '[DONE]') { onDone(); return }
+        if (!line.trim() || !line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") {
+          onDone();
+          return;
+        }
         try {
-          const json = JSON.parse(data)
-          const content = json.choices?.[0]?.delta?.content
-          if (content) onChunk(content)
-        } catch { /* ignore parse errors */ }
+          const json = JSON.parse(data);
+          const content = json.choices?.[0]?.delta?.content;
+          if (content) onChunk(content);
+        } catch {
+          /* ignore parse errors */
+        }
       }
     }
   } finally {
-    reader.releaseLock()
-    onDone()
+    reader.releaseLock();
+    onDone();
   }
 }
 
@@ -349,43 +431,103 @@ export function streamChat(
   chatConfig?: ChatConfig,
   memories?: { id: string; name: string; content: string }[],
   simplifiedSystemPrompt?: string | null,
-  extraContext?: string
+  extraContext?: string,
 ): StreamHandle {
-  let isAborted = false
+  let isAborted = false;
 
   const abort = () => {
-    isAborted = true
-    controller.abort()
-  }
+    isAborted = true;
+    controller.abort();
+  };
 
-  const controller = new AbortController()
-  
-  const config = chatConfig || getDefaultChatConfig()
-  const useNativeSearch = config.enabledTools.includes('WEB_SEARCH') && model.capabilities?.webSearch
-  const basePrompt = simplifiedSystemPrompt || assemblePrompt(config, memories, model).systemPrompt
-  const systemPrompt = extraContext ? `${extraContext}\n\n${basePrompt}` : basePrompt
+  const controller = new AbortController();
 
-  ;(async () => {
+  const config = chatConfig || getDefaultChatConfig();
+  const useNativeSearch =
+    config.enabledTools.includes("WEB_SEARCH") && model.capabilities?.webSearch;
+  const basePrompt =
+    simplifiedSystemPrompt ||
+    assemblePrompt(config, memories, model).systemPrompt;
+  const systemPrompt = extraContext
+    ? `${extraContext}\n\n${basePrompt}`
+    : basePrompt;
+
+  (async () => {
     try {
-      if (provider.id === 'anthropic') {
-        await streamAnthropic(provider, model, messages, systemPrompt, onChunk, onDone, onError, controller, useNativeSearch)
-      } else if (provider.id === 'google') {
-        await streamGoogle(provider, model, messages, systemPrompt, onChunk, onDone, onError, controller, useNativeSearch)
-      } else if (provider.id === 'groq') {
-        await streamGroq(provider, model, messages, systemPrompt, onChunk, onDone, onError, controller, useNativeSearch)
-      } else if (provider.id === 'fireworks') {
-        await streamOpenAICompatible(provider, model, messages, systemPrompt, onChunk, onDone, onError, controller, useNativeSearch)
+      if (provider.id === "anthropic") {
+        await streamAnthropic(
+          provider,
+          model,
+          messages,
+          systemPrompt,
+          onChunk,
+          onDone,
+          onError,
+          controller,
+          useNativeSearch,
+        );
+      } else if (provider.id === "google") {
+        await streamGoogle(
+          provider,
+          model,
+          messages,
+          systemPrompt,
+          onChunk,
+          onDone,
+          onError,
+          controller,
+          useNativeSearch,
+        );
+      } else if (provider.id === "groq") {
+        await streamGroq(
+          provider,
+          model,
+          messages,
+          systemPrompt,
+          onChunk,
+          onDone,
+          onError,
+          controller,
+          useNativeSearch,
+        );
+      } else if (provider.id === "fireworks") {
+        await streamOpenAICompatible(
+          provider,
+          model,
+          messages,
+          systemPrompt,
+          onChunk,
+          onDone,
+          onError,
+          controller,
+          useNativeSearch,
+        );
       } else {
-        await streamOpenAICompatible(provider, model, messages, systemPrompt, onChunk, onDone, onError, controller, useNativeSearch)
+        await streamOpenAICompatible(
+          provider,
+          model,
+          messages,
+          systemPrompt,
+          onChunk,
+          onDone,
+          onError,
+          controller,
+          useNativeSearch,
+        );
       }
     } catch (err) {
       if (!isAborted) {
-        onError(err instanceof Error ? err : new Error(String(err)))
+        onError(err instanceof Error ? err : new Error(String(err)));
       }
     }
-  })()
+  })();
 
-  return { abort, get isAborted() { return isAborted } }
+  return {
+    abort,
+    get isAborted() {
+      return isAborted;
+    },
+  };
 }
 
 async function streamOpenAICompatible(
@@ -397,35 +539,37 @@ async function streamOpenAICompatible(
   onDone: () => void,
   _onError: (error: Error) => void,
   controller: AbortController,
-  useNativeSearch: boolean = false
+  useNativeSearch: boolean = false,
 ) {
   // Build messages array with system prompt first
-  const apiMessages: Array<{ role: string; content: string }> = []
-  
+  const apiMessages: Array<{ role: string; content: string }> = [];
+
   if (systemPrompt) {
-    apiMessages.push({ role: 'system', content: systemPrompt })
+    apiMessages.push({ role: "system", content: systemPrompt });
   }
-  
-  apiMessages.push(...messages.map((m) => ({ role: m.role, content: m.content })))
+
+  apiMessages.push(
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  );
 
   const body: Record<string, unknown> = {
     model: model.id,
     messages: apiMessages,
     stream: true,
-  }
+  };
 
   if (useNativeSearch) {
-    if (provider.id === 'openai') {
-      body.tools = [{ type: "web_search" }]
-    } else if (provider.id === 'openrouter') {
-      body.tools = [{ type: "openrouter:web_search" }]
+    if (provider.id === "openai") {
+      body.tools = [{ type: "web_search" }];
+    } else if (provider.id === "openrouter") {
+      body.tools = [{ type: "openrouter:web_search" }];
     }
   }
 
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${provider.apiKey}`,
     },
     body: JSON.stringify({
@@ -434,46 +578,46 @@ async function streamOpenAICompatible(
       stream: true,
     }),
     signal: controller.signal,
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`API error: ${response.status} ${error}`);
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('No response body')
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
 
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const decoder = new TextDecoder();
+  let buffer = "";
 
   while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+    const { done, value } = await reader.read();
+    if (done) break;
 
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || !trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
-      if (data === '[DONE]') {
-        onDone()
-        return
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") {
+        onDone();
+        return;
       }
       try {
-        const parsed = JSON.parse(data)
-        const content = parsed.choices?.[0]?.delta?.content
-        if (content) onChunk(content)
+        const parsed = JSON.parse(data);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) onChunk(content);
       } catch {
         // Skip malformed JSON
       }
     }
   }
 
-  onDone()
+  onDone();
 }
 
 async function streamAnthropic(
@@ -485,73 +629,73 @@ async function streamAnthropic(
   onDone: () => void,
   _onError: (error: Error) => void,
   controller: AbortController,
-  useNativeSearch: boolean = false
+  useNativeSearch: boolean = false,
 ) {
   const requestBody: Record<string, unknown> = {
     model: model.id,
-    messages: messages.map((m) => ({ 
-      role: m.role === 'assistant' ? 'assistant' : 'user', 
-      content: m.content 
+    messages: messages.map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: m.content,
     })),
     max_tokens: 4096,
     stream: true,
-  }
-  
+  };
+
   if (systemPrompt) {
-    requestBody.system = systemPrompt
+    requestBody.system = systemPrompt;
   }
 
   if (useNativeSearch) {
-    requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }]
+    requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
   }
 
   const response = await fetch(`${provider.baseUrl}/v1/messages`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': provider.apiKey,
-      'anthropic-version': '2023-06-01',
+      "Content-Type": "application/json",
+      "x-api-key": provider.apiKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(requestBody),
     signal: controller.signal,
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`API error: ${response.status} ${error}`);
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('No response body')
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
 
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const decoder = new TextDecoder();
+  let buffer = "";
 
   while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+    const { done, value } = await reader.read();
+    if (done) break;
 
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || !trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
-      if (data === '[DONE]') {
-        onDone()
-        return
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") {
+        onDone();
+        return;
       }
       try {
-        const parsed = JSON.parse(data)
-        if (parsed.type === 'content_block_delta') {
-          const text = parsed.delta?.text
-          if (text) onChunk(text)
+        const parsed = JSON.parse(data);
+        if (parsed.type === "content_block_delta") {
+          const text = parsed.delta?.text;
+          if (text) onChunk(text);
         }
-        if (parsed.type === 'message_stop') {
-          onDone()
-          return
+        if (parsed.type === "message_stop") {
+          onDone();
+          return;
         }
       } catch {
         // Skip malformed JSON
@@ -559,7 +703,7 @@ async function streamAnthropic(
     }
   }
 
-  onDone()
+  onDone();
 }
 
 async function streamGoogle(
@@ -571,67 +715,67 @@ async function streamGoogle(
   onDone: () => void,
   _onError: (error: Error) => void,
   controller: AbortController,
-  useNativeSearch: boolean = false
+  useNativeSearch: boolean = false,
 ) {
-  const modelName = model.id.replace('models/', '')
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${provider.apiKey}&alt=sse`
+  const modelName = model.id.replace("models/", "");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${provider.apiKey}&alt=sse`;
 
   const requestBody: Record<string, unknown> = {
     contents: messages.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
+      role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     })),
-  }
-  
+  };
+
   if (systemPrompt) {
-    requestBody.systemInstruction = { parts: [{ text: systemPrompt }] }
+    requestBody.systemInstruction = { parts: [{ text: systemPrompt }] };
   }
 
   if (useNativeSearch) {
-    requestBody.groundingConfig = { sources: ["GOOGLE_SEARCH"] }
+    requestBody.groundingConfig = { sources: ["GOOGLE_SEARCH"] };
   }
 
   const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
     signal: controller.signal,
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`API error: ${response.status} ${error}`);
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('No response body')
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
 
-  const decoder = new TextDecoder()
-  let buffer = ''
+  const decoder = new TextDecoder();
+  let buffer = "";
 
   while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+    const { done, value } = await reader.read();
+    if (done) break;
 
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
 
     for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || !trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+      const data = trimmed.slice(5).trim();
       try {
-        const parsed = JSON.parse(data)
-        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
-        if (text) onChunk(text)
+        const parsed = JSON.parse(data);
+        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) onChunk(text);
       } catch {
         // Skip malformed JSON
       }
     }
   }
 
-  onDone()
+  onDone();
 }
 
 // Non-streaming version - waits for full response
@@ -643,37 +787,67 @@ export async function sendChatMessage(
   chatConfig?: ChatConfig,
   memories?: { id: string; name: string; content: string }[],
   simplifiedSystemPrompt?: string | null,
-  extraContext?: string
+  extraContext?: string,
 ): Promise<string> {
-  const config = chatConfig || getDefaultChatConfig()
-  const useNativeSearch = config.enabledTools.includes('WEB_SEARCH') && model.capabilities?.webSearch
-  const basePrompt = simplifiedSystemPrompt || assemblePrompt(config, memories, model).systemPrompt
-  const systemPrompt = extraContext ? `${extraContext}\n\n${basePrompt}` : basePrompt
+  const config = chatConfig || getDefaultChatConfig();
+  const useNativeSearch =
+    config.enabledTools.includes("WEB_SEARCH") && model.capabilities?.webSearch;
+  const basePrompt =
+    simplifiedSystemPrompt ||
+    assemblePrompt(config, memories, model).systemPrompt;
+  const systemPrompt = extraContext
+    ? `${extraContext}\n\n${basePrompt}`
+    : basePrompt;
 
-  if (provider.id === 'anthropic') {
-    return sendAnthropicMessage(provider, model, messages, systemPrompt, signal, useNativeSearch)
-  } else if (provider.id === 'google') {
-    return sendGoogleMessage(provider, model, messages, systemPrompt, signal, useNativeSearch)
+  if (provider.id === "anthropic") {
+    return sendAnthropicMessage(
+      provider,
+      model,
+      messages,
+      systemPrompt,
+      signal,
+      useNativeSearch,
+    );
+  } else if (provider.id === "google") {
+    return sendGoogleMessage(
+      provider,
+      model,
+      messages,
+      systemPrompt,
+      signal,
+      useNativeSearch,
+    );
   } else {
-    return sendOpenAICompatibleMessage(provider, model, messages, systemPrompt, signal, useNativeSearch)
+    return sendOpenAICompatibleMessage(
+      provider,
+      model,
+      messages,
+      systemPrompt,
+      signal,
+      useNativeSearch,
+    );
   }
 }
 
 export async function generateChatTitle(
   provider: Provider,
   model: Model,
-  messages: { role: string; content: string }[]
+  messages: { role: string; content: string }[],
 ): Promise<string> {
-  const systemPrompt = 'Generate a very short, concise title (3-6 words, under 45 characters) that summarizes this conversation. Return ONLY the title, nothing else.'
+  const systemPrompt =
+    "Generate a very short, concise title (3-6 words, under 45 characters) that summarizes this conversation. Return ONLY the title, nothing else.";
   try {
-    if (provider.id === 'anthropic') {
-      const anthropicMessages = messages.map((m) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content }))
+    if (provider.id === "anthropic") {
+      const anthropicMessages = messages.map((m) => ({
+        role: m.role === "system" ? "assistant" : m.role,
+        content: m.content,
+      }));
       const response = await fetch(`${provider.baseUrl}/v1/messages`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': provider.apiKey,
-          'anthropic-version': '2023-06-01',
+          "Content-Type": "application/json",
+          "x-api-key": provider.apiKey,
+          "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
           model: model.id,
@@ -682,45 +856,66 @@ export async function generateChatTitle(
           max_tokens: 20,
           temperature: 0.3,
         }),
-      })
-      const data = await response.json()
-      return data.content?.[0]?.text?.trim() || messages[0]?.content?.slice(0, 40) || 'New chat'
-    } else if (provider.id === 'google') {
-      const response = await fetch(`${provider.baseUrl}/v1/models/${model.id}:generateContent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': provider.apiKey,
+      });
+      const data = await response.json();
+      return (
+        data.content?.[0]?.text?.trim() ||
+        messages[0]?.content?.slice(0, 40) ||
+        "New chat"
+      );
+    } else if (provider.id === "google") {
+      const response = await fetch(
+        `${provider.baseUrl}/v1/models/${model.id}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": provider.apiKey,
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: `${systemPrompt}\n\n${messages.map((m) => `${m.role}: ${m.content}`).join("\n")}`,
+                  },
+                ],
+              },
+            ],
+            generationConfig: { maxOutputTokens: 20, temperature: 0.3 },
+          }),
         },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${messages.map(m => `${m.role}: ${m.content}`).join('\n')}` }] }],
-          generationConfig: { maxOutputTokens: 20, temperature: 0.3 },
-        }),
-      })
-      const data = await response.json()
-      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || messages[0]?.content?.slice(0, 40) || 'New chat'
+      );
+      const data = await response.json();
+      return (
+        data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
+        messages[0]?.content?.slice(0, 40) ||
+        "New chat"
+      );
     } else {
       const response = await fetch(`${provider.baseUrl}/v1/chat/completions`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${provider.apiKey}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${provider.apiKey}`,
         },
         body: JSON.stringify({
           model: model.id,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages,
-          ],
+          messages: [{ role: "system", content: systemPrompt }, ...messages],
           max_tokens: 20,
           temperature: 0.3,
         }),
-      })
-      const data = await response.json()
-      return data.choices?.[0]?.message?.content?.trim() || messages[0]?.content?.slice(0, 40) || 'New chat'
+      });
+      const data = await response.json();
+      return (
+        data.choices?.[0]?.message?.content?.trim() ||
+        messages[0]?.content?.slice(0, 40) ||
+        "New chat"
+      );
     }
   } catch {
-    return messages[0]?.content?.slice(0, 40) || 'New chat'
+    return messages[0]?.content?.slice(0, 40) || "New chat";
   }
 }
 
@@ -730,47 +925,49 @@ async function sendOpenAICompatibleMessage(
   messages: Message[],
   systemPrompt: string,
   signal?: AbortSignal,
-  useNativeSearch: boolean = false
+  useNativeSearch: boolean = false,
 ): Promise<string> {
-  const apiMessages: Array<{ role: string; content: string }> = []
-  
+  const apiMessages: Array<{ role: string; content: string }> = [];
+
   if (systemPrompt) {
-    apiMessages.push({ role: 'system', content: systemPrompt })
+    apiMessages.push({ role: "system", content: systemPrompt });
   }
-  
-  apiMessages.push(...messages.map((m) => ({ role: m.role, content: m.content })))
+
+  apiMessages.push(
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  );
 
   const body: Record<string, unknown> = {
     model: model.id,
     messages: apiMessages,
     stream: false,
-  }
+  };
 
   if (useNativeSearch) {
-    if (provider.id === 'openai') {
-      body.tools = [{ type: "web_search" }]
-    } else if (provider.id === 'openrouter') {
-      body.tools = [{ type: "openrouter:web_search" }]
+    if (provider.id === "openai") {
+      body.tools = [{ type: "web_search" }];
+    } else if (provider.id === "openrouter") {
+      body.tools = [{ type: "openrouter:web_search" }];
     }
   }
 
   const response = await fetch(`${provider.baseUrl}/v1/chat/completions`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${provider.apiKey}`,
     },
     body: JSON.stringify(body),
     signal,
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`API error: ${response.status} ${error}`);
   }
 
-  const data = await response.json()
-  return data.choices?.[0]?.message?.content || ''
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
 }
 
 async function sendAnthropicMessage(
@@ -779,44 +976,44 @@ async function sendAnthropicMessage(
   messages: Message[],
   systemPrompt: string,
   signal?: AbortSignal,
-  useNativeSearch: boolean = false
+  useNativeSearch: boolean = false,
 ): Promise<string> {
   const requestBody: Record<string, unknown> = {
     model: model.id,
-    messages: messages.map((m) => ({ 
-      role: m.role === 'assistant' ? 'assistant' : 'user', 
-      content: m.content 
+    messages: messages.map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: m.content,
     })),
     max_tokens: 4096,
     stream: false,
-  }
-  
+  };
+
   if (systemPrompt) {
-    requestBody.system = systemPrompt
+    requestBody.system = systemPrompt;
   }
 
   if (useNativeSearch) {
-    requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }]
+    requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
   }
 
   const response = await fetch(`${provider.baseUrl}/v1/messages`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': provider.apiKey,
-      'anthropic-version': '2023-06-01',
+      "Content-Type": "application/json",
+      "x-api-key": provider.apiKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(requestBody),
     signal,
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`API error: ${response.status} ${error}`);
   }
 
-  const data = await response.json()
-  return data.content?.[0]?.text || ''
+  const data = await response.json();
+  return data.content?.[0]?.text || "";
 }
 
 async function sendGoogleMessage(
@@ -825,97 +1022,98 @@ async function sendGoogleMessage(
   messages: Message[],
   systemPrompt: string,
   signal?: AbortSignal,
-  useNativeSearch: boolean = false
+  useNativeSearch: boolean = false,
 ): Promise<string> {
-  const modelName = model.id.replace('models/', '')
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${provider.apiKey}`
+  const modelName = model.id.replace("models/", "");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${provider.apiKey}`;
 
   const requestBody: Record<string, unknown> = {
     contents: messages.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
+      role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     })),
-  }
-  
+  };
+
   if (systemPrompt) {
-    requestBody.systemInstruction = { parts: [{ text: systemPrompt }] }
+    requestBody.systemInstruction = { parts: [{ text: systemPrompt }] };
   }
 
   if (useNativeSearch) {
-    requestBody.groundingConfig = { sources: ["GOOGLE_SEARCH"] }
+    requestBody.groundingConfig = { sources: ["GOOGLE_SEARCH"] };
   }
 
   const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
     signal,
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`API error: ${response.status} ${error}`);
   }
 
-  const data = await response.json()
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
 interface LangSearchResult {
-  id: string
-  name: string
-  url: string
-  displayUrl: string
-  snippet: string
-  summary?: string
-  datePublished?: string
+  id: string;
+  name: string;
+  url: string;
+  displayUrl: string;
+  snippet: string;
+  summary?: string;
+  datePublished?: string;
 }
 
 interface LangSearchResponse {
-  code: number
+  code: number;
   data: {
-    _type: string
-    queryContext: { originalQuery: string }
+    _type: string;
+    queryContext: { originalQuery: string };
     webPages?: {
-      totalEstimatedMatches: number
-      value: LangSearchResult[]
-    }
-  }
+      totalEstimatedMatches: number;
+      value: LangSearchResult[];
+    };
+  };
 }
 
 export async function searchWithLangSearch(
   query: string,
   apiKey: string,
-  options?: { count?: number; freshness?: string }
+  options?: { count?: number; freshness?: string },
 ): Promise<LangSearchResult[]> {
-  const response = await fetch('https://api.langsearch.com/v1/web-search', {
-    method: 'POST',
+  const response = await fetch("https://api.langsearch.com/v1/web-search", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       query,
-      freshness: options?.freshness || 'oneYear',
+      freshness: options?.freshness || "oneYear",
       summary: false,
       count: options?.count || 5,
     }),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`LangSearch API error: ${response.status} ${error}`)
+    const error = await response.text();
+    throw new Error(`LangSearch API error: ${response.status} ${error}`);
   }
 
-  const result: LangSearchResponse = await response.json()
-  if (result.code !== 200) throw new Error('LangSearch API returned non-200 status')
-  return result.data?.webPages?.value || []
+  const result: LangSearchResponse = await response.json();
+  if (result.code !== 200)
+    throw new Error("LangSearch API returned non-200 status");
+  return result.data?.webPages?.value || [];
 }
 
 export async function fetchPageWithJina(url: string): Promise<string> {
   const response = await fetch(`https://r.jina.ai/${encodeURIComponent(url)}`, {
-    headers: { 'Accept': 'text/markdown' },
-  })
-  if (!response.ok) throw new Error(`Jina error: ${response.status}`)
-  return await response.text()
+    headers: { Accept: "text/markdown" },
+  });
+  if (!response.ok) throw new Error(`Jina error: ${response.status}`);
+  return await response.text();
 }
