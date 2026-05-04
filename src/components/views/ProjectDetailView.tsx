@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../../store/useStore'
-import { Settings, Plus, Search, Check, Upload, FileText, X, Pencil, MessageCircle, Folder, Archive, ArchiveRestore, Trash2 } from 'lucide-react'
+import { Plus, Search, Check, Upload, FileText, X, Pencil, MessageCircle, Folder, Archive, ArchiveRestore, Trash2 } from 'lucide-react'
+import { getProjectIcon } from '../../lib/projectIcons'
 import { ChatMenu } from '../shared/ChatMenu'
 import type { ProjectFile } from '../../types'
 
@@ -224,48 +225,44 @@ export function ProjectDetailView() {
     )
   }
 
+  const ProjectIcon = getProjectIcon(project.icon)
+
   return (
     <div className="view on" style={{ flexDirection: 'column' }}>
       {/* Header */}
       <div style={{ padding: '20px 24px 0', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 10,
-                backgroundColor: project.color,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <FileText size={22} color="white" strokeWidth={2} />
-            </span>
-            <div>
-              <div style={{ fontSize: 'calc(var(--fs) + 6px)', fontWeight: 600, color: 'var(--tx)' }}>{project.name}</div>
-              {project.description && (
-                <div style={{ fontSize: 'calc(var(--fs) - 1px)', color: 'var(--tx3)', marginTop: 2 }}>{project.description}</div>
-              )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <button
+                onClick={() => setShowSettings(true)}
+                title="Edit project"
+                style={{
+                  width: 42, height: 42, borderRadius: 10,
+                  backgroundColor: project.color,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, border: 'none', cursor: 'pointer',
+                  position: 'relative', overflow: 'hidden', padding: 0,
+                }}
+              >
+                <ProjectIcon size={22} color="white" strokeWidth={2} />
+                <span className="proj-icon-hover">
+                  <Pencil size={14} color="white" />
+                </span>
+              </button>
+              <div>
+                <div style={{ fontSize: 'calc(var(--fs) + 6px)', fontWeight: 600, color: 'var(--tx)' }}>{project.name}</div>
+                {project.description && (
+                  <div style={{ fontSize: 'calc(var(--fs) - 1px)', color: 'var(--tx3)', marginTop: 2 }}>{project.description}</div>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="btn btn-sm" onClick={handleNewChat} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Plus size={11} />
+                New chat
+              </button>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button className="btn btn-sm" onClick={handleNewChat} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <Plus size={11} />
-              New chat
-            </button>
-            <button
-              className="btn btn-sm"
-              onClick={() => setShowSettings(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              <Settings size={11} />
-              Settings
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Main content */}

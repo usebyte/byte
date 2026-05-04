@@ -183,19 +183,7 @@ function ProviderModal({
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.45)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 2000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-      onClick={onClose}
-    >
+    <div className="modal-overlay" onClick={onClose}>
       <div
         style={{
           background: 'var(--sf)',
@@ -835,15 +823,7 @@ function ConnectionsPanel() {
         {/* API Key Modal */}
         {showKeyModal && (
           <div
-            style={{
-              position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.45)',
-              backdropFilter: 'blur(4px)',
-              zIndex: 2000,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className="modal-overlay"
             onClick={() => setShowKeyModal(false)}
           >
             <div

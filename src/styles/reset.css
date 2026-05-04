@@ -444,7 +444,7 @@ body.glow-ring.glow-hi .home-in-box {
   text-align: left;
 }
 .chat-menu-item:hover {
-  background: var(--sf1);
+  background: rgba(var(--acc-r),var(--acc-g),var(--acc-b),.07);
 }
 .chat-menu-item-danger {
   color: var(--danger);
@@ -468,6 +468,22 @@ body.glow-ring.glow-hi .home-in-box {
 .sb-rec-label { flex: 1; font-size: 12px; color: var(--tx3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--ease); }
 .sb-rec-row:hover .sb-rec-label, .sb-rec-row.on .sb-rec-label { color: var(--tx2); }
 .sb-rec-saved { color: var(--acc); flex-shrink: 0; }
+
+/* Project icon edit hover */
+.proj-icon-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.4);
+  border-radius: 10px;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+button:hover .proj-icon-hover {
+  opacity: 1;
+}
 
 /* Expiry arc indicator */
 .expiry-arc {

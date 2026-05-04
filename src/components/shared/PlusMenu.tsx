@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import {
   Plus, Paperclip, Camera, Folder, BookOpen, Zap, Search, Pen, ChevronRight, Check, X, Brain, Info,
 } from 'lucide-react'
+import { getProjectIcon } from '../../lib/projectIcons'
 import type { ResponseStyleId, Project } from '../../types'
 
 interface PlusMenuProps {
@@ -307,6 +308,7 @@ export function PlusMenu({
         ) : (
           activeProjects.map((project) => {
             const isInProject = activeChatId ? project.chatIds.includes(activeChatId) : false
+            const ProjectIcon = getProjectIcon(project.icon)
             return (
               <button
                 key={project.id}
@@ -347,7 +349,7 @@ export function PlusMenu({
                 }}
               >
                 <span style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: project.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Folder size={8} color="white" />
+                  <ProjectIcon size={8} color="white" />
                 </span>
                 <span style={{ flex: 1 }}>{project.name}</span>
                 {isInProject && <X size={10} style={{ color: 'var(--tx4)' }} />}
@@ -504,15 +506,7 @@ export function PlusMenu({
 
     return createPortal(
       <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.4)',
-        }}
+        className="modal-overlay"
         onClick={() => setShowApiKeyModal(false)}
       >
         <div

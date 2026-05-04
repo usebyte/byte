@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { MoreHorizontal, Star, Pencil, Trash2 } from 'lucide-react'
 
 interface ChatMenuProps {
@@ -10,12 +11,16 @@ interface ChatMenuProps {
 
 export function ChatMenu({ onStar, onRename, onDelete, isSaved }: ChatMenuProps) {
   const [open, setOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ top: 0, right: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false)
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        const dd = document.getElementById('chat-menu-portal')
+        if (dd && !dd.contains(e.target as Node)) {
+          setOpen(false)
+        }
       }
     }
     if (open) {
@@ -24,17 +29,31 @@ export function ChatMenu({ onStar, onRename, onDelete, isSaved }: ChatMenuProps)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (open) { setOpen(false); return }
+    const rect = btnRef.current!.getBoundingClientRect()
+    setPosition({ top: rect.bottom + 6, right: window.innerWidth - rect.right })
+    setOpen(true)
+  }
+
   return (
-    <div className="chat-menu-wrap" ref={menuRef}>
+    <>
       <button
         className="chat-menu-btn"
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        ref={btnRef}
+        onClick={handleOpen}
         title="More options"
       >
         <MoreHorizontal size={14} />
       </button>
-      {open && (
-        <div className="chat-menu-dropdown">
+      {open && createPortal(
+        <div
+          id="chat-menu-portal"
+          className="chat-menu-dropdown"
+          style={{ position: 'fixed', top: position.top, right: position.right, zIndex: 9999 }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             className="chat-menu-item"
             onClick={(e) => { e.stopPropagation(); onStar(); setOpen(false) }}
@@ -57,8 +76,9 @@ export function ChatMenu({ onStar, onRename, onDelete, isSaved }: ChatMenuProps)
             <Trash2 size={13} />
             <span>Delete</span>
           </button>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
