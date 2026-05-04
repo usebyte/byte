@@ -270,12 +270,17 @@ jobs:
           echo "Homebrew formula created"
 
       - name: Upload manifest to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            update.json
-            byte.rb
-          generate_release_notes: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          gh release upload "$TAG" update.json --clobber
+          if [ -f byte.rb ]; then
+            gh release upload "$TAG" byte.rb --clobber
+          fi
+          # Generate release notes on the already-existing release
+          gh release edit "$TAG" --generate-notes || true
 
       - name: Push formula to homebrew-byte tap
         if: hashFiles('byte.rb') != ''
