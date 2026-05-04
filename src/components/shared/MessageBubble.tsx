@@ -1,35 +1,51 @@
-import { useState, memo, useRef, useCallback } from 'react'
-import { Copy, Check, ThumbsUp, ThumbsDown, Share2, RefreshCw, ChevronDown, Search, Loader2, Globe } from 'lucide-react'
-import { MarkdownRenderer } from '../../lib/markdown'
-import type { Message } from '../../types'
+import { useState, memo, useRef, useCallback } from "react";
+import {
+  Copy,
+  Check,
+  ThumbsUp,
+  ThumbsDown,
+  Share2,
+  RefreshCw,
+  ChevronDown,
+  Search,
+  Loader2,
+  Globe,
+} from "lucide-react";
+import { MarkdownRenderer } from "../../lib/markdown";
+import type { Message } from "../../types";
 
 interface MessageBubbleProps {
-  message: Message
+  message: Message;
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text)
-    return true
+    await navigator.clipboard.writeText(text);
+    return true;
   } catch {
-    return false
+    return false;
   }
 }
 
 function LoadingDots() {
   return (
-    <span className="loading-dots" style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
-      <span style={{ animationDelay: '0ms' }} />
-      <span style={{ animationDelay: '150ms' }} />
-      <span style={{ animationDelay: '300ms' }} />
+    <span
+      className="loading-dots"
+      style={{ display: "inline-flex", gap: "4px", alignItems: "center" }}
+    >
+      <span style={{ animationDelay: "0ms" }} />
+      <span style={{ animationDelay: "150ms" }} />
+      <span style={{ animationDelay: "300ms" }} />
     </span>
-  )
+  );
 }
 
 function containsAskQuestion(content: string): boolean {
-  return content.includes('"tool":"ask_question"') || 
-         content.includes('"tool": "ask_question"') ||
-         content.includes('<ask_question>');
+  return (
+    content.includes('"tool":"ask_question"') ||
+    content.includes('"tool": "ask_question"') ||
+    content.includes("<ask_question>")
+  );
 }
 
 function getAskQuestionDisplayText(content: string): string {
@@ -39,125 +55,211 @@ function getAskQuestionDisplayText(content: string): string {
       return questionMatch[1];
     }
   } catch {}
-  return 'Asking Question...';
+  return "Asking Question...";
 }
 
 // Hook that returns [ref, visible]. Once visible, stays visible forever.
 function useLazyVisible(): [React.RefCallback<HTMLDivElement>, boolean] {
-  const [visible, setVisible] = useState(false)
-  const observedRef = useRef<HTMLDivElement | null>(null)
+  const [visible, setVisible] = useState(false);
+  const observedRef = useRef<HTMLDivElement | null>(null);
 
   const ref = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return
+    if (!node) return;
     // Check if already in viewport
-    const rect = node.getBoundingClientRect()
+    const rect = node.getBoundingClientRect();
     if (rect.top < window.innerHeight + 600 && rect.bottom > -600) {
-      setVisible(true)
-      return
+      setVisible(true);
+      return;
     }
     // Observe until visible
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setVisible(true)
-          observer.disconnect()
+          setVisible(true);
+          observer.disconnect();
         }
       },
-      { rootMargin: '600px 0px' }
-    )
-    observer.observe(node)
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(node);
     // Cleanup previous observation if ref changes
     if (observedRef.current && observedRef.current !== node) {
-      observer.disconnect()
+      observer.disconnect();
     }
-    observedRef.current = node
-  }, [])
+    observedRef.current = node;
+  }, []);
 
-  return [ref, visible]
+  return [ref, visible];
 }
 
-export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
-  const [copied, setCopied] = useState(false)
-  const [showSources, setShowSources] = useState(true)
-  const [lazyRef, visible] = useLazyVisible()
+export const MessageBubble = memo(function MessageBubble({
+  message,
+}: MessageBubbleProps) {
+  const [copied, setCopied] = useState(false);
+  const [showSources, setShowSources] = useState(true);
+  const [lazyRef, visible] = useLazyVisible();
 
   const handleCopy = async () => {
-    const success = await copyToClipboard(message.content)
+    const success = await copyToClipboard(message.content);
     if (success) {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
-  }
+  };
 
-  const isUser = message.role === 'user'
-  const isGenerating = message.status === 'streaming' && !message.content
-  const isStreaming = message.status === 'streaming'
+  const isUser = message.role === "user";
+  const isGenerating = message.status === "streaming" && !message.content;
+  const isStreaming = message.status === "streaming";
 
-  const isAskQuestionResult = message.content.includes('"tool":"ask_question_result"') ||
-                               message.content.includes('"tool": "ask_question_result"');
+  const isAskQuestionResult =
+    message.content.includes('"tool":"ask_question_result"') ||
+    message.content.includes('"tool": "ask_question_result"');
 
   let displayContent = message.content;
   let showContent = true;
-  
+
   // Hidden messages (e.g., search results context) are not rendered
-  if (message.hidden) return null
+  if (message.hidden) return null;
 
   // Strip tool calls from display if they are web search tools
-  if (!isUser && displayContent.includes('"tool"') && (displayContent.includes('"web_search"') || displayContent.includes('"news_search"') || displayContent.includes('"search"'))) {
+  if (
+    !isUser &&
+    displayContent.includes('"tool"') &&
+    (displayContent.includes('"web_search"') ||
+      displayContent.includes('"news_search"') ||
+      displayContent.includes('"search"'))
+  ) {
     // 1. Remove markdown code blocks containing the tool call
-    displayContent = displayContent.replace(/```[\w-]*\s*[\s\S]*?```/g, (match) => {
-      if (match.includes('"tool"') && (match.includes('"web_search"') || match.includes('"news_search"') || match.includes('"search"'))) {
-        return '';
-      }
-      return match;
-    });
+    displayContent = displayContent.replace(
+      /```[\w-]*\s*[\s\S]*?```/g,
+      (match) => {
+        if (
+          match.includes('"tool"') &&
+          (match.includes('"web_search"') ||
+            match.includes('"news_search"') ||
+            match.includes('"search"'))
+        ) {
+          return "";
+        }
+        return match;
+      },
+    );
 
     // 2. Remove any remaining raw JSON blocks containing the tool call
-    displayContent = displayContent.replace(/\{[\s\S]*?"tool"\s*:\s*"(?:web_search|news_search|search)"[\s\S]*?\}/g, '');
-    
+    displayContent = displayContent.replace(
+      /\{[\s\S]*?"tool"\s*:\s*"(?:web_search|news_search|search)"[\s\S]*?\}/g,
+      "",
+    );
+
     displayContent = displayContent.trim();
   }
 
   // Web search sources dropdown - real-time with Searched/Fetched sections
-  const hasSearchSources = message.webSearchSources && message.webSearchSources.length > 0
-  const hasFetchedSources = message.webSearchFetched && message.webSearchFetched.length > 0
-  const isSearching = message.searchPhase === 'searching'
-  const isFetching = message.searchPhase === 'fetching'
-  const searchDone = message.searchPhase === 'done'
-  const showSearchDropdown = hasSearchSources || isSearching || isFetching || searchDone
+  const hasSearchSources =
+    message.webSearchSources && message.webSearchSources.length > 0;
+  const hasFetchedSources =
+    message.webSearchFetched && message.webSearchFetched.length > 0;
+  const isSearching = message.searchPhase === "searching";
+  const isFetching = message.searchPhase === "fetching";
+  const searchDone = message.searchPhase === "done";
+  const showSearchDropdown =
+    hasSearchSources || isSearching || isFetching || searchDone;
+
+  // Describe phase handling
+  const isDescribing = message.describePhase === "describing";
 
   if (isUser && isAskQuestionResult) {
-    displayContent = 'Sent Answers';
+    displayContent = "Sent Answers";
   } else if (!isUser && containsAskQuestion(message.content)) {
     displayContent = getAskQuestionDisplayText(message.content);
-  } else if (isUser && message.content.startsWith('{') && message.content.includes('"tool"')) {
+  } else if (
+    isUser &&
+    message.content.startsWith("{") &&
+    message.content.includes('"tool"')
+  ) {
     showContent = false;
   }
 
-  if (message.role === 'system') {
+  if (message.role === "system") {
     return (
-      <div ref={lazyRef} className="msg" style={{ justifyContent: 'center' }}>
-        <div className="msg-body" style={{ textAlign: 'center' }}>
-          <div className="msg-txt" style={{ color: 'var(--tx3)', fontSize: 'calc(var(--fs) - 1px)' }}>
+      <div ref={lazyRef} className="msg" style={{ justifyContent: "center" }}>
+        <div className="msg-body" style={{ textAlign: "center" }}>
+          <div
+            className="msg-txt"
+            style={{ color: "var(--tx3)", fontSize: "calc(var(--fs) - 1px)" }}
+          >
             {message.content}
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Decide what to render
-  let content: React.ReactNode
+  let content: React.ReactNode;
   if (isUser) {
-    content = showContent ? <span>{displayContent}</span> : <span style={{ color: 'var(--tx3)', fontStyle: 'italic' }}>Sent Answers</span>
+    content = showContent ? (
+      <span>{displayContent}</span>
+    ) : (
+      <span style={{ color: "var(--tx3)", fontStyle: "italic" }}>
+        Sent Answers
+      </span>
+    );
   } else if (isGenerating) {
-    content = <LoadingDots />
+    content = <LoadingDots />;
   } else if (isStreaming || visible) {
     // Streaming or visible — render full markdown
-    content = <MarkdownRenderer content={displayContent} />
+    content = <MarkdownRenderer content={displayContent} />;
   } else {
     // Offscreen — show plain text as a lightweight placeholder
-    content = <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--tx2)' }}>{displayContent}</div>
+    content = (
+      <div
+        style={{
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          color: "var(--tx2)",
+        }}
+      >
+        {displayContent}
+      </div>
+    );
+  }
+
+  // Prepend describe phase indicator
+  if (isDescribing) {
+    content = (
+      <>
+        <div
+          style={{
+            background: "var(--sf2)",
+            border: "1px solid var(--bd)",
+            borderRadius: 10,
+            padding: "8px 12px",
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Loader2
+            size={13}
+            style={{
+              color: "var(--acc)",
+              animation: "spin 1s linear infinite",
+            }}
+          />
+          <span
+            style={{
+              fontSize: "calc(var(--fs) - 1px)",
+              color: "var(--tx2)",
+              fontWeight: 500,
+            }}
+          >
+            {message.content || "Analyzing images..."}
+          </span>
+        </div>
+      </>
+    );
   }
 
   // Prepend web search sources for assistant messages with real-time updates
@@ -166,11 +268,11 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
       <>
         <div
           style={{
-            background: 'var(--sf2)',
-            border: '1px solid var(--bd)',
+            background: "var(--sf2)",
+            border: "1px solid var(--bd)",
             borderRadius: 10,
-            overflow: 'hidden',
-            transition: 'all 0.25s ease-out',
+            overflow: "hidden",
+            transition: "all 0.25s ease-out",
             marginBottom: 12,
           }}
         >
@@ -178,57 +280,78 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
           <div
             onClick={() => setShowSources(!showSources)}
             style={{
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
               gap: 8,
-              padding: '8px 12px',
-              userSelect: 'none',
-              transition: 'background 0.15s ease',
+              padding: "8px 12px",
+              userSelect: "none",
+              transition: "background 0.15s ease",
             }}
           >
-            <Search size={13} style={{ color: 'var(--acc)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: 'calc(var(--fs) - 1px)', color: 'var(--tx2)', fontWeight: 500 }}>
-              {isSearching && 'Searching...'}
-              {isFetching && 'Fetching pages...'}
-              {searchDone && 'Search complete'}
+            <Search size={13} style={{ color: "var(--acc)", flexShrink: 0 }} />
+            <span
+              style={{
+                flex: 1,
+                fontSize: "calc(var(--fs) - 1px)",
+                color: "var(--tx2)",
+                fontWeight: 500,
+              }}
+            >
+              {isSearching && "Searching..."}
+              {isFetching && "Fetching pages..."}
+              {searchDone && "Search complete"}
             </span>
             {(isSearching || isFetching) && (
-              <Loader2 size={13} style={{ color: 'var(--tx3)', animation: 'spin 1s linear infinite' }} />
+              <Loader2
+                size={13}
+                style={{
+                  color: "var(--tx3)",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
             )}
-            <ChevronDown 
-              size={13} 
-              style={{ 
-                color: 'var(--tx3)',
-                transform: showSources ? 'rotate(180deg)' : 'none', 
-                transition: 'transform 0.2s ease-out' 
-              }} 
+            <ChevronDown
+              size={13}
+              style={{
+                color: "var(--tx3)",
+                transform: showSources ? "rotate(180deg)" : "none",
+                transition: "transform 0.2s ease-out",
+              }}
             />
           </div>
-          
+
           {/* Expandable content - same background as header */}
           {showSources && (
-            <div style={{ 
-              padding: '0 12px 10px',
-              animation: 'fadeIn 0.2s ease-out',
-            }}>
+            <div
+              style={{
+                padding: "0 12px 10px",
+                animation: "fadeIn 0.2s ease-out",
+              }}
+            >
               {/* Divider */}
-              <div style={{ height: 1, background: 'var(--bd)', marginBottom: 10 }} />
-              
+              <div
+                style={{ height: 1, background: "var(--bd)", marginBottom: 10 }}
+              />
+
               {/* Searched section */}
               {hasSearchSources && (
                 <div style={{ marginBottom: hasFetchedSources ? 10 : 0 }}>
-                  <div style={{ 
-                    fontSize: '10px', 
-                    fontWeight: 600, 
-                    color: 'var(--tx3)', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.05em',
-                    marginBottom: 6,
-                  }}>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      color: "var(--tx3)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      marginBottom: 6,
+                    }}
+                  >
                     Searched
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 1 }}
+                  >
                     {message.webSearchSources!.map((s, i) => (
                       <a
                         key={`searched-${i}`}
@@ -236,20 +359,29 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
                         target="_blank"
                         rel="noreferrer"
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
+                          display: "flex",
+                          alignItems: "center",
                           gap: 6,
-                          fontSize: 'calc(var(--fs) - 2px)',
-                          color: 'var(--acc)',
-                          textDecoration: 'none',
-                          padding: '3px 0',
-                          transition: 'opacity 0.2s ease-out',
-                          animation: 'fadeIn 0.2s ease-out',
+                          fontSize: "calc(var(--fs) - 2px)",
+                          color: "var(--acc)",
+                          textDecoration: "none",
+                          padding: "3px 0",
+                          transition: "opacity 0.2s ease-out",
+                          animation: "fadeIn 0.2s ease-out",
                         }}
                         title={s.url}
                       >
-                        <Globe size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Globe
+                          size={11}
+                          style={{ flexShrink: 0, opacity: 0.6 }}
+                        />
+                        <span
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {s.title || s.url}
                         </span>
                       </a>
@@ -257,21 +389,25 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
                   </div>
                 </div>
               )}
-              
+
               {/* Fetched section */}
               {hasFetchedSources && (
                 <div>
-                  <div style={{ 
-                    fontSize: '10px', 
-                    fontWeight: 600, 
-                    color: 'var(--acc)', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.05em',
-                    marginBottom: 6,
-                  }}>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      color: "var(--acc)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      marginBottom: 6,
+                    }}
+                  >
                     Fetched
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 1 }}
+                  >
                     {message.webSearchFetched!.map((s, i) => (
                       <a
                         key={`fetched-${i}`}
@@ -279,20 +415,29 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
                         target="_blank"
                         rel="noreferrer"
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
+                          display: "flex",
+                          alignItems: "center",
                           gap: 6,
-                          fontSize: 'calc(var(--fs) - 2px)',
-                          color: 'var(--acc)',
-                          textDecoration: 'none',
-                          padding: '3px 0',
-                          transition: 'opacity 0.2s ease-out',
-                          animation: 'fadeIn 0.2s ease-out',
+                          fontSize: "calc(var(--fs) - 2px)",
+                          color: "var(--acc)",
+                          textDecoration: "none",
+                          padding: "3px 0",
+                          transition: "opacity 0.2s ease-out",
+                          animation: "fadeIn 0.2s ease-out",
                         }}
                         title={s.url}
                       >
-                        <Globe size={11} style={{ flexShrink: 0, opacity: 0.6 }} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Globe
+                          size={11}
+                          style={{ flexShrink: 0, opacity: 0.6 }}
+                        />
+                        <span
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {s.title || s.url}
                         </span>
                       </a>
@@ -303,22 +448,87 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             </div>
           )}
         </div>
-        
-        <div style={{ marginTop: 8 }}>
-          {content}
-        </div>
+
+        <div style={{ marginTop: 8 }}>{content}</div>
       </>
-    )
+    );
   }
 
+  // Render image attachments
+  const attachmentContent =
+    message.attachments && message.attachments.length > 0 ? (
+      <div
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}
+      >
+        {message.attachments.map((att) => (
+          <div
+            key={att.id}
+            style={{
+              position: "relative",
+              width: 120,
+              borderRadius: 8,
+              overflow: "hidden",
+              border: "1px solid var(--bd)",
+              background: "var(--sf2)",
+            }}
+          >
+            <img
+              src={att.dataUri}
+              alt={att.fileName}
+              style={{
+                width: "100%",
+                display: "block",
+                cursor: "pointer",
+              }}
+              onClick={() => window.open(att.dataUri, "_blank")}
+            />
+            {((att.mode === "describe" && att.description) ||
+              (att.mode === "ocr" && att.description)) && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: "4px 6px",
+                  background:
+                    att.mode === "ocr"
+                      ? "rgba(34, 197, 94, 0.9)"
+                      : "rgba(0,0,0,0.7)",
+                  fontSize: "9px",
+                  color: "#fff",
+                  textAlign: "center",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}
+                title={
+                  att.mode === "ocr"
+                    ? `Extracted text: ${att.description}`
+                    : `Described by ${att.describedBy}: ${att.description}`
+                }
+              >
+                {att.mode === "ocr" ? "OCR" : "Described"}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    ) : null;
+
   return (
-    <div ref={lazyRef} className={`msg${isUser ? ' u' : ''}`}>
+    <div ref={lazyRef} className={`msg${isUser ? " u" : ""}`}>
       <div className="msg-body">
         <div className="msg-txt">
+          {attachmentContent}
           {content}
         </div>
         <div className="msg-acts">
-          <button className="msg-act" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>
+          <button
+            className="msg-act"
+            onClick={handleCopy}
+            title={copied ? "Copied!" : "Copy"}
+          >
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
           {!isUser && (
@@ -340,5 +550,5 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
         </div>
       </div>
     </div>
-  )
-})
+  );
+});

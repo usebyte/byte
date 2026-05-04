@@ -12,6 +12,7 @@ import type {
   ResponseStyleId,
   AskQuestionPayload,
   ToolId,
+  ImageAttachment,
 } from "../../types";
 import { MessageBubble } from "../shared/MessageBubble";
 import { InputBox } from "../shared/InputBox";
@@ -23,7 +24,9 @@ import {
   generateChatTitle,
   makeModelKey,
   resolveModel,
+  describeImage,
 } from "../../lib/api";
+import { extractTextOCR } from "../../lib/ocr";
 import { getSlashCommandPrompt } from "../../lib/slashCommands";
 
 interface ChatViewProps {
@@ -50,6 +53,7 @@ export function ChatView({
     langSearchEnabled,
     setDefaultWebSearchEnabled,
     projects,
+    ocrEnabled,
   } = useStore();
   const effectiveLangSearchApiKey = langSearchEnabled ? langSearchApiKey : "";
   const [isLoading, setIsLoading] = useState(false);
@@ -910,7 +914,7 @@ export function ChatView({
   };
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, attachments?: ImageAttachment[]) => {
       if (!activeChatId || !text.trim()) return;
 
       // Check if this is a slash command and get simplified prompt (skips MAIN.md + tools to save tokens)
@@ -960,12 +964,102 @@ export function ChatView({
       console.log("Provider:", provider?.id);
       console.groupEnd();
 
+      // Handle describe-mode and OCR-mode attachments
+      let processedAttachments = attachments;
+      if (
+        attachments &&
+        attachments.some((a) => a.mode === "describe" || a.mode === "ocr")
+      ) {
+        // Show interstitial message while processing
+        const hasDescribe = attachments.some((a) => a.mode === "describe");
+        const hasOCR = attachments.some((a) => a.mode === "ocr");
+
+        const describingMsg: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            hasDescribe && hasOCR
+              ? "Analyzing images and extracting text..."
+              : hasOCR
+                ? "Extracting text..."
+                : "Analyzing images...",
+          timestamp: Date.now(),
+          status: "streaming",
+          describePhase: "describing",
+        };
+
+        updateChat(activeChatId, {
+          messages: [...(chat?.messages || []), describingMsg],
+        });
+
+        // Process each describe-mode and OCR-mode attachment
+        processedAttachments = await Promise.all(
+          attachments.map(async (attachment) => {
+            if (attachment.mode === "describe") {
+              try {
+                const description = await describeImage(
+                  provider,
+                  model,
+                  attachment.dataUri,
+                  attachment.mimeType,
+                );
+                return {
+                  ...attachment,
+                  description,
+                  describedBy: model.name || model.id,
+                };
+              } catch (error) {
+                console.error("[BYTE] Error describing image:", error);
+                // Return original attachment if description fails
+                return attachment;
+              }
+            } else if (attachment.mode === "ocr") {
+              if (!ocrEnabled) {
+                // OCR not enabled, keep original attachment
+                console.warn(
+                  "[BYTE] OCR requested but not enabled in settings",
+                );
+                return attachment;
+              }
+              try {
+                const extractedText = await extractTextOCR(
+                  attachment.dataUri,
+                  (progress) => {
+                    // Optional: update progress message
+                    console.log("OCR progress:", progress);
+                  },
+                );
+                return {
+                  ...attachment,
+                  description: extractedText,
+                  describedBy: "Tesseract OCR",
+                };
+              } catch (error) {
+                console.error(
+                  "[BYTE] Error extracting text from image:",
+                  error,
+                );
+                // Return original attachment if OCR fails
+                return attachment;
+              }
+            }
+            return attachment;
+          }),
+        );
+
+        // Remove the describing message
+        updateChat(activeChatId, {
+          messages: chat?.messages || [],
+        });
+      }
+
       const userMsg: Message = {
         id: crypto.randomUUID(),
         role: "user",
         content: text.trim(),
         timestamp: Date.now(),
         status: "sent",
+        attachments: processedAttachments,
       };
 
       const assistantMsg: Message = {
@@ -1135,6 +1229,7 @@ export function ChatView({
           memories, // Pass memories for context
           simplifiedSystemPrompt, // Use simplified prompt for slash commands (null for normal messages)
           getProjectContext(),
+          processedAttachments, // Pass image attachments
         );
         streamAbortRef.current = handle.abort;
       } else {
@@ -1150,6 +1245,7 @@ export function ChatView({
             memories, // Pass memories for context
             simplifiedSystemPrompt, // Use simplified prompt for slash commands (null for normal messages)
             getProjectContext(),
+            processedAttachments, // Pass image attachments
           );
 
           const askQuestion = parseAskQuestionTool(response);
@@ -1245,10 +1341,11 @@ export function ChatView({
       const detail = (e as CustomEvent).detail as {
         text: string;
         chatId: string;
+        attachments?: ImageAttachment[];
       };
       if (detail?.text && detail?.chatId) {
         if (detail.chatId === activeChatId) {
-          handleSend(detail.text);
+          handleSend(detail.text, detail.attachments);
         }
       }
     };

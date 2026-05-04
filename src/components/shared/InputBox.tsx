@@ -6,11 +6,11 @@ import { PlusMenu } from "./PlusMenu";
 import { ModelPicker } from "./ModelPicker";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import type { SlashCommand } from "./SlashCommandMenu";
-import type { ResponseStyleId } from "../../types";
+import type { ResponseStyleId, ImageAttachment, ImageMode } from "../../types";
 
 interface InputBoxProps {
   variant: "home" | "chat";
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: ImageAttachment[]) => void;
   isStreaming?: boolean;
   onStop?: () => void;
   value?: string;
@@ -42,6 +42,8 @@ export function InputBox({
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [localWebSearch, setLocalWebSearch] = useState(false);
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modelChipRef = useRef<HTMLButtonElement>(null);
@@ -57,6 +59,9 @@ export function InputBox({
     removeChatFromProject,
     activeProjectId,
     setActiveProjectId,
+    visionDefaultMode,
+    ocrEnabled,
+    imageDescriptionModelId,
   } = useStore();
 
   const effectiveLangSearchApiKey = langSearchEnabled ? langSearchApiKey : "";
@@ -121,14 +126,15 @@ export function InputBox({
   );
 
   const handleSend = useCallback(() => {
-    if (!text.trim() || isStreaming) return;
-    onSend(text.trim());
+    if ((!text.trim() && attachments.length === 0) || isStreaming) return;
+    onSend(text.trim(), attachments.length > 0 ? attachments : undefined);
     handleTextChange("");
+    setAttachments([]);
     setShowSlashMenu(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [text, isStreaming, onSend, handleTextChange]);
+  }, [text, attachments, isStreaming, onSend, handleTextChange]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -144,6 +150,145 @@ export function InputBox({
 
   const handleAddFiles = () => {
     fileInputRef.current?.click();
+  };
+
+  const processImageFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUri = reader.result as string;
+
+      // Smart default based on visionDefaultMode
+      let defaultMode: ImageMode;
+
+      if (visionDefaultMode === "changeable") {
+        // Use existing smart logic: vision if model supports it, otherwise OCR
+        defaultMode = model?.capabilities?.supportsVision ? "vision" : "ocr";
+      } else if (visionDefaultMode === "vision") {
+        defaultMode = "vision";
+      } else if (visionDefaultMode === "ocr") {
+        defaultMode = "ocr";
+      } else if (visionDefaultMode === "describe") {
+        defaultMode = "describe";
+      } else {
+        // Fallback
+        defaultMode = model?.capabilities?.supportsVision ? "vision" : "ocr";
+      }
+
+      const newAttachment: ImageAttachment = {
+        id: `${Date.now()}-${Math.random()}`,
+        fileName: file.name,
+        mimeType: file.type,
+        dataUri,
+        size: file.size,
+        mode: defaultMode,
+      };
+      setAttachments((prev) => [...prev, newAttachment]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+
+    for (const file of imageFiles) {
+      processImageFile(file);
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+
+    for (const file of files) {
+      processImageFile(file);
+    }
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items);
+    const imageItems = items.filter((item) => item.type.startsWith("image/"));
+
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      for (const item of imageItems) {
+        const file = item.getAsFile();
+        if (file) {
+          processImageFile(file);
+        }
+      }
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const cycleAttachmentMode = (id: string) => {
+    // If visionDefaultMode is not "changeable", don't allow cycling (mode is locked)
+    if (visionDefaultMode !== "changeable") {
+      return;
+    }
+
+    setAttachments((prev) =>
+      prev.map((a) => {
+        if (a.id !== id) return a;
+
+        // Determine which modes are available
+        const availableModes: ImageMode[] = [];
+
+        if (model?.capabilities?.supportsVision) {
+          availableModes.push("vision");
+        }
+        if (ocrEnabled) {
+          availableModes.push("ocr");
+        }
+        if (imageDescriptionModelId) {
+          availableModes.push("describe");
+        }
+
+        // If no modes available or only one mode, don't cycle
+        if (availableModes.length <= 1) return a;
+
+        // Find current mode index and cycle to next available mode
+        const currentIndex = availableModes.indexOf(a.mode);
+        const nextIndex = (currentIndex + 1) % availableModes.length;
+        const newMode = availableModes[nextIndex];
+
+        return { ...a, mode: newMode };
+      }),
+    );
   };
 
   const handleScreenshot = () => {};
@@ -179,7 +324,115 @@ export function InputBox({
 
   return (
     <div className={`in-wrap${variant === "home" ? "" : ""}`}>
-      <div className={`in-box${variant === "home" ? " home-in-box" : ""}`}>
+      <div
+        className={`in-box${variant === "home" ? " home-in-box" : ""}${isDragging ? " dragging" : ""}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        style={{
+          border: isDragging ? "2px dashed var(--acc)" : undefined,
+          background: isDragging
+            ? "rgba(var(--acc-r),var(--acc-g),var(--acc-b),.05)"
+            : undefined,
+          transition: "border 0.2s, background 0.2s",
+        }}
+      >
+        {/* Attachment thumbnails - moved to top */}
+        {attachments.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              padding: "8px 0",
+              flexWrap: "wrap",
+            }}
+          >
+            {attachments.map((att) => (
+              <div
+                key={att.id}
+                style={{
+                  position: "relative",
+                  width: 72,
+                  height: 72,
+                  borderRadius: "var(--r-md)",
+                  overflow: "hidden",
+                  border: "1px solid var(--bd)",
+                  background: "var(--sf2)",
+                }}
+              >
+                <img
+                  src={att.dataUri}
+                  alt={att.fileName}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+
+                {/* Remove button */}
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  title="Remove image"
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: "rgba(0,0,0,0.7)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    padding: 0,
+                  }}
+                >
+                  <X size={12} />
+                </button>
+
+                {/* Mode badge - only show if changeable */}
+                {visionDefaultMode === "changeable" && (
+                  <button
+                    onClick={() => cycleAttachmentMode(att.id)}
+                    title={`Mode: ${att.mode === "vision" ? "Vision" : att.mode === "ocr" ? "OCR" : "Describe"} (click to cycle)`}
+                    style={{
+                      position: "absolute",
+                      bottom: 4,
+                      left: 4,
+                      padding: "3px 6px",
+                      borderRadius: "var(--r-sm)",
+                      background:
+                        att.mode === "vision"
+                          ? "rgba(59, 130, 246, 0.9)" // Blue
+                          : att.mode === "ocr"
+                            ? "rgba(34, 197, 94, 0.9)" // Green
+                            : "rgba(168, 85, 247, 0.9)", // Purple
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      cursor: "pointer",
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      color: "#fff",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}
+                  >
+                    {att.mode === "vision"
+                      ? "Vision"
+                      : att.mode === "ocr"
+                        ? "OCR"
+                        : "Describe"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           className={variant === "home" ? "byte-ta" : "small-ta"}
@@ -187,14 +440,16 @@ export function InputBox({
           value={text}
           onChange={(e) => handleTextChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           rows={variant === "home" ? 3 : 1}
         />
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,.pdf,.txt,.docx"
+          accept="image/*"
           multiple
           style={{ display: "none" }}
+          onChange={handleFileChange}
         />
         {showSlashMenu && (
           <SlashCommandMenu
@@ -208,6 +463,7 @@ export function InputBox({
             direction={variant === "chat" ? "up" : "down"}
           />
         )}
+
         <div
           className={variant === "home" ? "home-in-footer" : "in-row-bottom"}
         >
@@ -279,11 +535,13 @@ export function InputBox({
                   onClick={() => setIsModelPickerOpen(!isModelPickerOpen)}
                   title="Change model"
                 >
-                  {getDisplayName(model.id)}
+                  {model.name || getDisplayName(model.id)}
                   <ChevronDown size={12} style={{ marginLeft: "4px" }} />
                 </button>
               ) : (
-                <span className="model-chip">{getDisplayName(model.id)}</span>
+                <span className="model-chip">
+                  {model.name || getDisplayName(model.id)}
+                </span>
               ))}
             <ModelPicker
               isOpen={isModelPickerOpen}

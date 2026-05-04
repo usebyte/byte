@@ -1,9 +1,10 @@
-import type {
+odimport type {
   Provider,
   Model,
   Message,
   StreamHandle,
   ChatConfig,
+  ImageAttachment,
 } from "../types";
 import { assemblePrompt, getDefaultChatConfig } from "./prompts";
 
@@ -104,10 +105,56 @@ export function modelHasNativeWebSearch(
   return false;
 }
 
+export function modelSupportsVision(
+  providerId: string,
+  modelId: string,
+): boolean {
+  const id = modelId.toLowerCase();
+  if (providerId === "openai") {
+    return (
+      id.includes("gpt-4o") ||
+      id.includes("gpt-4-turbo") ||
+      id.includes("gpt-4-vision") ||
+      id.includes("o1") ||
+      id.includes("o3") ||
+      id.includes("o4") ||
+      id.includes("chatgpt-4o")
+    );
+  }
+  if (providerId === "anthropic") {
+    return id.includes("claude-3") || id.includes("claude-4");
+  }
+  if (providerId === "google") {
+    return id.includes("gemini") || id.includes("gemma");
+  }
+  if (providerId === "groq") {
+    return (
+      id.includes("vision") || id.includes("scout") || id.includes("maverick")
+    );
+  }
+  if (providerId === "openrouter") {
+    return (
+      id.includes("vision") ||
+      id.includes("gpt-4o") ||
+      id.includes("claude-3") ||
+      id.includes("gemini") ||
+      id.includes("llava") ||
+      id.includes("pixtral") ||
+      id.includes("qwen-vl") ||
+      id.includes("minicpm") ||
+      id.includes("phi-3.5")
+    );
+  }
+  if (providerId === "mistral") return id.includes("pixtral");
+  if (providerId === "together")
+    return id.includes("vision") || id.includes("llava");
+  return false;
+}
+
 export function formatContextWindow(contextWindow: number): string {
   if (contextWindow >= 1000000)
-    return `${Math.round(contextWindow / 1000000)}M`;
-  if (contextWindow >= 1000) return `${Math.round(contextWindow / 1000)}K`;
+    return `${Math.floor(contextWindow / 1000000)}M`;
+  if (contextWindow >= 1000) return `${Math.floor(contextWindow / 1000)}K`;
   return contextWindow.toString();
 }
 
@@ -139,7 +186,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         providerId: provider.id,
         contextWindow: m.inputTokenLimit || 128000,
         enabled: false,
-        capabilities: { webSearch: modelHasNativeWebSearch(provider.id, id) },
+        capabilities: {
+          webSearch: modelHasNativeWebSearch(provider.id, id),
+          supportsVision: modelSupportsVision(provider.id, id),
+        },
       };
     });
   } else if (provider.id === "groq") {
@@ -155,7 +205,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_window || 128000,
       enabled: false,
-      capabilities: { webSearch: modelHasNativeWebSearch(provider.id, m.id) },
+      capabilities: {
+        webSearch: modelHasNativeWebSearch(provider.id, m.id),
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (provider.id === "cerebras") {
     // Cerebras's public endpoint returns full model metadata including context_length.
@@ -175,7 +228,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_length || 128000,
       enabled: false,
-      capabilities: { webSearch: false },
+      capabilities: {
+        webSearch: false,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (provider.id === "huggingface") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -197,7 +253,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         providerId: provider.id,
         contextWindow: m.context_window || m.config?.context_length || 4096,
         enabled: false,
-        capabilities: { webSearch: false },
+        capabilities: {
+          webSearch: false,
+          supportsVision: modelSupportsVision(provider.id, m.id),
+        },
       }));
   } else if (provider.id === "cohere") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -214,7 +273,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         providerId: provider.id,
         contextWindow: m.context_window_size || m.context_window || 4096,
         enabled: false,
-        capabilities: { webSearch: false },
+        capabilities: {
+          webSearch: false,
+          supportsVision: modelSupportsVision(provider.id, m.id),
+        },
       }));
   } else if (provider.id === "perplexity") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -229,7 +291,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_window || 128000,
       enabled: false,
-      capabilities: { webSearch: true },
+      capabilities: {
+        webSearch: true,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (provider.id === "together") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -244,7 +309,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_window || m.context_length || 128000,
       enabled: false,
-      capabilities: { webSearch: false },
+      capabilities: {
+        webSearch: false,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (provider.id === "replicate") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -261,7 +329,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.version?.controller?.max_length || 4096,
       enabled: false,
-      capabilities: { webSearch: false },
+      capabilities: {
+        webSearch: false,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (provider.id === "fireworks") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -276,7 +347,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_window || 128000,
       enabled: false,
-      capabilities: { webSearch: false },
+      capabilities: {
+        webSearch: false,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (provider.id === "openrouter") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -291,7 +365,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_length || m.context_window || 128000,
       enabled: false,
-      capabilities: { webSearch: true },
+      capabilities: {
+        webSearch: true,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (provider.id === "ollama" || provider.id === "lmstudio") {
     let modelsData: any[] = [];
@@ -318,7 +395,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_window || m.context_length || 4096,
       enabled: false,
-      capabilities: { webSearch: false },
+      capabilities: {
+        webSearch: false,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else if (
     provider.id === "mistral" ||
@@ -337,7 +417,10 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       providerId: provider.id,
       contextWindow: m.context_window || m.context_length || 128000,
       enabled: false,
-      capabilities: { webSearch: false },
+      capabilities: {
+        webSearch: false,
+        supportsVision: modelSupportsVision(provider.id, m.id),
+      },
     }));
   } else {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
@@ -362,12 +445,202 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         providerId: provider.id,
         contextWindow,
         enabled: false,
-        capabilities: { webSearch: modelHasNativeWebSearch(provider.id, m.id) },
+        capabilities: {
+          webSearch: modelHasNativeWebSearch(provider.id, m.id),
+          supportsVision: modelSupportsVision(provider.id, m.id),
+        },
       };
     });
   }
 
   return [];
+}
+
+export async function extractTextFromImage(
+  provider: Provider,
+  model: Model,
+  dataUri: string,
+  mimeType: string,
+): Promise<string> {
+  const base64Data = dataUri.includes(",") ? dataUri.split(",")[1] : dataUri;
+  const prompt =
+    "Extract all visible text from this image. Return only the text you can see, preserving formatting and layout as much as possible. If there's no text, return '[No text found]'.";
+
+  if (provider.id === "anthropic") {
+    const resp = await fetch(`${provider.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": provider.apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: model.id,
+        max_tokens: 2048,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mimeType,
+                  data: base64Data,
+                },
+              },
+              { type: "text", text: prompt },
+            ],
+          },
+        ],
+      }),
+    });
+    const data = await resp.json();
+    return data.content?.[0]?.text || "[No text found]";
+  }
+
+  if (provider.id === "google") {
+    const modelName = model.id.replace("models/", "");
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${provider.apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { inlineData: { mimeType, data: base64Data } },
+                { text: prompt },
+              ],
+            },
+          ],
+        }),
+      },
+    );
+    const data = await resp.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "[No text found]";
+  }
+
+  // OpenAI-compatible default
+  const resp = await fetch(`${provider.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${provider.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: model.id,
+      max_tokens: 2048,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: dataUri } },
+          ],
+        },
+      ],
+    }),
+  });
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || "[No text found]";
+}
+
+export async function describeImage(
+  provider: Provider,
+  model: Model,
+  dataUri: string,
+  mimeType: string,
+): Promise<string> {
+  const base64Data = dataUri.includes(",") ? dataUri.split(",")[1] : dataUri;
+  const prompt =
+    "Describe this image concisely and accurately in 1-3 sentences, focusing on what would be most useful context for answering questions about it.";
+
+  if (provider.id === "anthropic") {
+    const resp = await fetch(`${provider.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": provider.apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: model.id,
+        max_tokens: 512,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mimeType,
+                  data: base64Data,
+                },
+              },
+              { type: "text", text: prompt },
+            ],
+          },
+        ],
+      }),
+    });
+    const data = await resp.json();
+    return data.content?.[0]?.text || "Could not describe image.";
+  }
+
+  if (provider.id === "google") {
+    const modelName = model.id.replace("models/", "");
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${provider.apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { inlineData: { mimeType, data: base64Data } },
+                { text: prompt },
+              ],
+            },
+          ],
+        }),
+      },
+    );
+    const data = await resp.json();
+    return (
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Could not describe image."
+    );
+  }
+
+  // OpenAI-compatible default
+  const resp = await fetch(`${provider.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${provider.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: model.id,
+      max_tokens: 512,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: dataUri } },
+          ],
+        },
+      ],
+    }),
+  });
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || "Could not describe image.";
 }
 
 async function streamGroq(
@@ -463,6 +736,7 @@ export function streamChat(
   memories?: { id: string; name: string; content: string }[],
   simplifiedSystemPrompt?: string | null,
   extraContext?: string,
+  attachments?: ImageAttachment[],
 ): StreamHandle {
   let isAborted = false;
 
@@ -496,6 +770,7 @@ export function streamChat(
           onError,
           controller,
           useNativeSearch,
+          attachments,
         );
       } else if (provider.id === "google") {
         await streamGoogle(
@@ -508,6 +783,7 @@ export function streamChat(
           onError,
           controller,
           useNativeSearch,
+          attachments,
         );
       } else if (provider.id === "groq") {
         await streamGroq(
@@ -532,6 +808,7 @@ export function streamChat(
           onError,
           controller,
           useNativeSearch,
+          attachments,
         );
       } else {
         await streamOpenAICompatible(
@@ -544,6 +821,7 @@ export function streamChat(
           onError,
           controller,
           useNativeSearch,
+          attachments,
         );
       }
     } catch (err) {
@@ -571,16 +849,30 @@ async function streamOpenAICompatible(
   _onError: (error: Error) => void,
   controller: AbortController,
   useNativeSearch: boolean = false,
+  attachments?: ImageAttachment[],
 ) {
-  // Build messages array with system prompt first
-  const apiMessages: Array<{ role: string; content: string }> = [];
-
+  const apiMessages: Array<{ role: string; content: any }> = [];
   if (systemPrompt) {
     apiMessages.push({ role: "system", content: systemPrompt });
   }
-
+  const lastUserIdx = messages.reduce(
+    (acc, m, i) => (m.role === "user" ? i : acc),
+    -1,
+  );
   apiMessages.push(
-    ...messages.map((m) => ({ role: m.role, content: m.content })),
+    ...messages.map((m, i) => {
+      if (i === lastUserIdx && attachments && attachments.length > 0) {
+        const parts: any[] = [];
+        if (m.content) parts.push({ type: "text", text: m.content });
+        for (const att of attachments) {
+          if (att.mode === "vision") {
+            parts.push({ type: "image_url", image_url: { url: att.dataUri } });
+          }
+        }
+        return { role: m.role, content: parts.length > 1 ? parts : m.content };
+      }
+      return { role: m.role, content: m.content };
+    }),
   );
 
   const body: Record<string, unknown> = {
@@ -661,13 +953,40 @@ async function streamAnthropic(
   _onError: (error: Error) => void,
   controller: AbortController,
   useNativeSearch: boolean = false,
+  attachments?: ImageAttachment[],
 ) {
-  const requestBody: Record<string, unknown> = {
-    model: model.id,
-    messages: messages.map((m) => ({
+  const apiMessages = messages.map((m, i) => {
+    const isLastUser =
+      m.role === "user" &&
+      i ===
+        messages.reduce((a, msg, idx) => (msg.role === "user" ? idx : a), -1);
+    if (isLastUser && attachments && attachments.length > 0) {
+      const parts: any[] = [];
+      for (const att of attachments) {
+        if (att.mode === "vision") {
+          parts.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: att.mimeType,
+              data: att.dataUri.includes(",")
+                ? att.dataUri.split(",")[1]
+                : att.dataUri,
+            },
+          });
+        }
+      }
+      if (m.content) parts.push({ type: "text", text: m.content });
+      return { role: "user", content: parts.length > 1 ? parts : m.content };
+    }
+    return {
       role: m.role === "assistant" ? "assistant" : "user",
       content: m.content,
-    })),
+    };
+  });
+  const requestBody: Record<string, unknown> = {
+    model: model.id,
+    messages: apiMessages,
     max_tokens: 4096,
     stream: true,
   };
@@ -747,15 +1066,34 @@ async function streamGoogle(
   _onError: (error: Error) => void,
   controller: AbortController,
   useNativeSearch: boolean = false,
+  attachments?: ImageAttachment[],
 ) {
   const modelName = model.id.replace("models/", "");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${provider.apiKey}&alt=sse`;
 
+  const lastUserIdx = messages.reduce(
+    (a, m, i) => (m.role === "user" ? i : a),
+    -1,
+  );
+  const contents = messages.map((m, i) => {
+    const role = m.role === "assistant" ? "model" : "user";
+    if (i === lastUserIdx && attachments && attachments.length > 0) {
+      const parts: any[] = [];
+      if (m.content) parts.push({ text: m.content });
+      for (const att of attachments) {
+        if (att.mode === "vision") {
+          const b64 = att.dataUri.includes(",")
+            ? att.dataUri.split(",")[1]
+            : att.dataUri;
+          parts.push({ inlineData: { mimeType: att.mimeType, data: b64 } });
+        }
+      }
+      return { role, parts };
+    }
+    return { role, parts: [{ text: m.content }] };
+  });
   const requestBody: Record<string, unknown> = {
-    contents: messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    })),
+    contents,
   };
 
   if (systemPrompt) {
@@ -819,6 +1157,7 @@ export async function sendChatMessage(
   memories?: { id: string; name: string; content: string }[],
   simplifiedSystemPrompt?: string | null,
   extraContext?: string,
+  attachments?: ImageAttachment[],
 ): Promise<string> {
   const config = chatConfig || getDefaultChatConfig();
   const useNativeSearch =
@@ -838,6 +1177,7 @@ export async function sendChatMessage(
       systemPrompt,
       signal,
       useNativeSearch,
+      attachments,
     );
   } else if (provider.id === "google") {
     return sendGoogleMessage(
@@ -847,6 +1187,7 @@ export async function sendChatMessage(
       systemPrompt,
       signal,
       useNativeSearch,
+      attachments,
     );
   } else {
     return sendOpenAICompatibleMessage(
@@ -856,6 +1197,7 @@ export async function sendChatMessage(
       systemPrompt,
       signal,
       useNativeSearch,
+      attachments,
     );
   }
 }
@@ -957,15 +1299,30 @@ async function sendOpenAICompatibleMessage(
   systemPrompt: string,
   signal?: AbortSignal,
   useNativeSearch: boolean = false,
+  attachments?: ImageAttachment[],
 ): Promise<string> {
-  const apiMessages: Array<{ role: string; content: string }> = [];
-
+  const apiMessages: Array<{ role: string; content: any }> = [];
   if (systemPrompt) {
     apiMessages.push({ role: "system", content: systemPrompt });
   }
-
+  const lastUserIdx = messages.reduce(
+    (acc, m, i) => (m.role === "user" ? i : acc),
+    -1,
+  );
   apiMessages.push(
-    ...messages.map((m) => ({ role: m.role, content: m.content })),
+    ...messages.map((m, i) => {
+      if (i === lastUserIdx && attachments && attachments.length > 0) {
+        const parts: any[] = [];
+        if (m.content) parts.push({ type: "text", text: m.content });
+        for (const att of attachments) {
+          if (att.mode === "vision") {
+            parts.push({ type: "image_url", image_url: { url: att.dataUri } });
+          }
+        }
+        return { role: m.role, content: parts.length > 1 ? parts : m.content };
+      }
+      return { role: m.role, content: m.content };
+    }),
   );
 
   const body: Record<string, unknown> = {
@@ -1008,13 +1365,40 @@ async function sendAnthropicMessage(
   systemPrompt: string,
   signal?: AbortSignal,
   useNativeSearch: boolean = false,
+  attachments?: ImageAttachment[],
 ): Promise<string> {
-  const requestBody: Record<string, unknown> = {
-    model: model.id,
-    messages: messages.map((m) => ({
+  const apiMessages = messages.map((m, i) => {
+    const isLastUser =
+      m.role === "user" &&
+      i ===
+        messages.reduce((a, msg, idx) => (msg.role === "user" ? idx : a), -1);
+    if (isLastUser && attachments && attachments.length > 0) {
+      const parts: any[] = [];
+      for (const att of attachments) {
+        if (att.mode === "vision") {
+          parts.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: att.mimeType,
+              data: att.dataUri.includes(",")
+                ? att.dataUri.split(",")[1]
+                : att.dataUri,
+            },
+          });
+        }
+      }
+      if (m.content) parts.push({ type: "text", text: m.content });
+      return { role: "user", content: parts.length > 1 ? parts : m.content };
+    }
+    return {
       role: m.role === "assistant" ? "assistant" : "user",
       content: m.content,
-    })),
+    };
+  });
+  const requestBody: Record<string, unknown> = {
+    model: model.id,
+    messages: apiMessages,
     max_tokens: 4096,
     stream: false,
   };
@@ -1054,15 +1438,34 @@ async function sendGoogleMessage(
   systemPrompt: string,
   signal?: AbortSignal,
   useNativeSearch: boolean = false,
+  attachments?: ImageAttachment[],
 ): Promise<string> {
   const modelName = model.id.replace("models/", "");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${provider.apiKey}`;
 
+  const lastUserIdx = messages.reduce(
+    (a, m, i) => (m.role === "user" ? i : a),
+    -1,
+  );
+  const contents = messages.map((m, i) => {
+    const role = m.role === "assistant" ? "model" : "user";
+    if (i === lastUserIdx && attachments && attachments.length > 0) {
+      const parts: any[] = [];
+      if (m.content) parts.push({ text: m.content });
+      for (const att of attachments) {
+        if (att.mode === "vision") {
+          const b64 = att.dataUri.includes(",")
+            ? att.dataUri.split(",")[1]
+            : att.dataUri;
+          parts.push({ inlineData: { mimeType: att.mimeType, data: b64 } });
+        }
+      }
+      return { role, parts };
+    }
+    return { role, parts: [{ text: m.content }] };
+  });
   const requestBody: Record<string, unknown> = {
-    contents: messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    })),
+    contents,
   };
 
   if (systemPrompt) {

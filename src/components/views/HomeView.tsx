@@ -4,7 +4,7 @@ import { useStore } from "../../store/useStore";
 import { InputBox } from "../shared/InputBox";
 import { makeModelKey, resolveModel } from "../../lib/api";
 import { ICON_MAP } from "../../lib/quickPrompts";
-import type { ResponseStyleId } from "../../types";
+import type { ResponseStyleId, ImageAttachment } from "../../types";
 import type { Prompt } from "../../lib/quickPrompts";
 
 interface PlaceholderWizardState {
@@ -91,7 +91,7 @@ export function HomeView() {
     contextWindow > 0 ? (tokenCount / contextWindow) * 100 : 0;
   const greeting = getGreeting();
 
-  const handleSend = (text: string) => {
+  const handleSend = (text: string, attachments?: ImageAttachment[]) => {
     if (!text.trim()) return;
     const chatId = newChat(
       text,
@@ -101,7 +101,9 @@ export function HomeView() {
     );
     setTimeout(() => {
       window.dispatchEvent(
-        new CustomEvent("byte:new-chat-message", { detail: { text, chatId } }),
+        new CustomEvent("byte:new-chat-message", {
+          detail: { text, chatId, attachments },
+        }),
       );
     }, 50);
     setInputValue("");

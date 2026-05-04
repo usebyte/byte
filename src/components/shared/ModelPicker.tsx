@@ -286,7 +286,7 @@ export function ModelPicker({
                       marginBottom: "2px",
                     }}
                   >
-                    {getDisplayName(m.id)}
+                    {m.name || getDisplayName(m.id)}
                   </div>
                   <div
                     style={{
@@ -330,7 +330,7 @@ export function ModelPicker({
 }
 
 function formatContext(ctx: number): string {
-  if (ctx >= 1000000) return `${Math.round(ctx / 1000000)}M`;
-  if (ctx >= 1000) return `${Math.round(ctx / 1000)}K`;
+  if (ctx >= 1000000) return `${Math.floor(ctx / 1000000)}M`;
+  if (ctx >= 1000) return `${Math.floor(ctx / 1000)}K`;
   return ctx.toString();
 }

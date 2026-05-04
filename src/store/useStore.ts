@@ -49,6 +49,20 @@ interface AppState {
   // Web Search API Key
   langSearchApiKey: string;
   langSearchEnabled: boolean;
+  imageDescriptionModelId: string | null;
+  setImageDescriptionModelId: (id: string | null) => void;
+
+  // OCR Settings
+  ocrInstalled: boolean;
+  ocrEnabled: boolean;
+  setOcrInstalled: (installed: boolean) => void;
+  setOcrEnabled: (enabled: boolean) => void;
+
+  // Vision Default Mode
+  visionDefaultMode: "changeable" | "vision" | "ocr" | "describe";
+  setVisionDefaultMode: (
+    mode: "changeable" | "vision" | "ocr" | "describe",
+  ) => void;
 
   // Quick Prompts
   quickPrompts: QuickPromptCategory[];
@@ -216,7 +230,11 @@ export const useStore = create<AppState>()(
       defaultMemoryEnabled: false,
       defaultWebSearchEnabled: false,
       langSearchApiKey: "",
-      langSearchEnabled: true,
+      langSearchEnabled: false,
+      imageDescriptionModelId: null,
+      ocrInstalled: false,
+      ocrEnabled: false,
+      visionDefaultMode: "changeable",
       memories: [],
       quickPrompts: DEFAULT_QUICK_PROMPTS,
       projects: [],
@@ -373,6 +391,11 @@ export const useStore = create<AppState>()(
       setLangSearchApiKey: (langSearchApiKey) =>
         set({ langSearchApiKey, langSearchEnabled: !!langSearchApiKey }),
       setLangSearchEnabled: (langSearchEnabled) => set({ langSearchEnabled }),
+      setImageDescriptionModelId: (imageDescriptionModelId) =>
+        set({ imageDescriptionModelId }),
+      setOcrInstalled: (ocrInstalled) => set({ ocrInstalled }),
+      setOcrEnabled: (ocrEnabled) => set({ ocrEnabled }),
+      setVisionDefaultMode: (visionDefaultMode) => set({ visionDefaultMode }),
       addMemory: (memory) =>
         set((s) => ({
           memories: [
