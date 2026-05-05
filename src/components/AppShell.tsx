@@ -217,6 +217,42 @@ export function AppShell() {
     }
   }, [activeChatId, chat, updateChat]);
 
+  // Global drag-and-drop handlers to allow drops on nested elements
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      // Prevent default browser drop behavior
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    document.addEventListener("dragover", handleDragOver);
+    document.addEventListener("dragenter", handleDragEnter);
+    document.addEventListener("dragleave", handleDragLeave);
+    document.addEventListener("drop", handleDrop);
+
+    return () => {
+      document.removeEventListener("dragover", handleDragOver);
+      document.removeEventListener("dragenter", handleDragEnter);
+      document.removeEventListener("dragleave", handleDragLeave);
+      document.removeEventListener("drop", handleDrop);
+    };
+  }, []);
+
   const renderView = () => {
     switch (activeView) {
       case "home":

@@ -2,6 +2,7 @@ export type ImageMode = "vision" | "ocr" | "describe";
 
 export interface ImageAttachment {
   id: string;
+  type: "image";
   fileName: string;
   mimeType: string;
   dataUri: string; // full data:image/... base64 URI
@@ -10,6 +11,18 @@ export interface ImageAttachment {
   description?: string; // populated after describe-mode API call
   describedBy?: string; // display name of model used to describe
 }
+
+export interface FileAttachment {
+  id: string;
+  type: "file";
+  fileName: string;
+  mimeType: string;
+  fileContent: string; // text content or converted markdown
+  size: number; // bytes
+  originalContent?: string; // original content before conversion
+}
+
+export type Attachment = ImageAttachment | FileAttachment;
 
 export interface Message {
   id: string;
@@ -20,7 +33,7 @@ export interface Message {
   status: "sending" | "sent" | "streaming" | "done" | "error";
   pinned?: boolean;
   hidden?: boolean;
-  attachments?: ImageAttachment[];
+  attachments?: Attachment[];
   webSearchSources?: { url: string; title: string }[];
   webSearchFetched?: { url: string; title: string }[];
   searchPhase?: "searching" | "fetching" | "done";

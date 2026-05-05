@@ -460,59 +460,64 @@ export const MessageBubble = memo(function MessageBubble({
       <div
         style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}
       >
-        {message.attachments.map((att) => (
-          <div
-            key={att.id}
-            style={{
-              position: "relative",
-              width: 120,
-              borderRadius: 8,
-              overflow: "hidden",
-              border: "1px solid var(--bd)",
-              background: "var(--sf2)",
-            }}
-          >
-            <img
-              src={att.dataUri}
-              alt={att.fileName}
+        {message.attachments.map((att) => {
+          // Only show image attachments in messages (files are embedded in text)
+          if (att.type !== "image") return null;
+          
+          return (
+            <div
+              key={att.id}
               style={{
-                width: "100%",
-                display: "block",
-                cursor: "pointer",
+                position: "relative",
+                width: 120,
+                borderRadius: 8,
+                overflow: "hidden",
+                border: "1px solid var(--bd)",
+                background: "var(--sf2)",
               }}
-              onClick={() => window.open(att.dataUri, "_blank")}
-            />
-            {((att.mode === "describe" && att.description) ||
-              (att.mode === "ocr" && att.description)) && (
-              <div
+            >
+              <img
+                src={att.dataUri}
+                alt={att.fileName}
                 style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  padding: "4px 6px",
-                  background:
-                    att.mode === "ocr"
-                      ? "rgba(34, 197, 94, 0.9)"
-                      : "rgba(0,0,0,0.7)",
-                  fontSize: "9px",
-                  color: "#fff",
-                  textAlign: "center",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
+                  width: "100%",
+                  display: "block",
+                  cursor: "pointer",
                 }}
-                title={
-                  att.mode === "ocr"
-                    ? `Extracted text: ${att.description}`
-                    : `Described by ${att.describedBy}: ${att.description}`
-                }
-              >
-                {att.mode === "ocr" ? "OCR" : "Described"}
-              </div>
-            )}
-          </div>
-        ))}
+                onClick={() => window.open(att.dataUri, "_blank")}
+              />
+              {((att.mode === "describe" && att.description) ||
+                (att.mode === "ocr" && att.description)) && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    padding: "4px 6px",
+                    background:
+                      att.mode === "ocr"
+                        ? "rgba(34, 197, 94, 0.9)"
+                        : "rgba(0,0,0,0.7)",
+                    fontSize: "9px",
+                    color: "#fff",
+                    textAlign: "center",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                  title={
+                    att.mode === "ocr"
+                      ? `Extracted text: ${att.description}`
+                      : `Described by ${att.describedBy}: ${att.description}`
+                  }
+                >
+                  {att.mode === "ocr" ? "OCR" : "Described"}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     ) : null;
 

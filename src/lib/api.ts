@@ -1,4 +1,4 @@
-odimport type {
+import type {
   Provider,
   Model,
   Message,
@@ -653,20 +653,79 @@ async function streamGroq(
   _onError: (error: Error) => void,
   controller: AbortController,
   _useNativeSearch: boolean = false,
+  _attachments?: ImageAttachment[],
 ) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${provider.apiKey}`,
   };
 
-  const apiMessages: Array<{ role: string; content: string }> = [];
+  const apiMessages: Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }> = [];
 
   if (systemPrompt) {
     apiMessages.push({ role: "system", content: systemPrompt });
   }
 
   apiMessages.push(
-    ...messages.map((m) => ({ role: m.role, content: m.content })),
+    ...messages.map((m) => {
+      // Separate vision and non-vision attachments (only ImageAttachments have mode)
+      const imageAttachments = m.attachments?.filter((a) => a.type === "image") as ImageAttachment[] | undefined || [];
+      const visionAttachments = imageAttachments.filter((a) => a.mode === "vision");
+      const ocrAttachments = imageAttachments.filter((a) => a.mode === "ocr");
+      const describeAttachments = imageAttachments.filter((a) => a.mode === "describe");
+      
+      // Debug: log attachments
+      if (m.attachments && m.attachments.length > 0) {
+        console.log("[Groq] Message attachments:", {
+          total: m.attachments.length,
+          vision: visionAttachments.length,
+          ocr: ocrAttachments.length,
+          describe: describeAttachments.length,
+          attachments: m.attachments.map((a) => ({ type: a.type, mode: (a as any).mode, hasDescription: !!(a as any).description })),
+        });
+      }
+      
+      // Build message content
+      let messageContent = m.content;
+      
+      // Add OCR extracted text
+      for (const att of ocrAttachments) {
+        if (att.description) {
+          messageContent += `\n\n[OCR from ${att.fileName}]\n${att.description}`;
+        }
+      }
+      
+      // Add describe extracted text
+      for (const att of describeAttachments) {
+        if (att.description) {
+          messageContent += `\n\n[Image description of ${att.fileName}]\n${att.description}`;
+        }
+      }
+      
+      if (m.role === "user" && visionAttachments.length > 0 && model.capabilities?.supportsVision) {
+        // Build multimodal content for vision attachments
+        const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+        
+        // Add text content
+        if (messageContent.trim()) {
+          content.push({ type: "text", text: messageContent });
+        }
+        
+        // Add images
+        for (const att of visionAttachments) {
+          if (att.type === "image") {
+            content.push({
+              type: "image_url",
+              image_url: { url: att.dataUri },
+            });
+          }
+        }
+        
+        return { role: m.role, content };
+      }
+      
+      return { role: m.role, content: messageContent };
+    }),
   );
 
   const response = await fetch(
@@ -710,6 +769,11 @@ async function streamGroq(
           onDone();
           return;
         }
+        // Skip error objects that may appear in stream
+        if (data.startsWith("{") && data.includes("error")) {
+          console.warn("[Groq] Ignoring error in stream:", data);
+          continue;
+        }
         try {
           const json = JSON.parse(data);
           const content = json.choices?.[0]?.delta?.content;
@@ -720,6 +784,12 @@ async function streamGroq(
       }
     }
   } finally {
+    // Read any remaining buffered data
+    if (buffer.trim()) {
+      if (buffer.includes("error")) {
+        console.warn("[Groq] Ignoring error in buffered data:", buffer);
+      }
+    }
     reader.releaseLock();
     onDone();
   }
@@ -796,6 +866,7 @@ export function streamChat(
           onError,
           controller,
           useNativeSearch,
+          attachments,
         );
       } else if (provider.id === "fireworks") {
         await streamOpenAICompatible(
@@ -849,7 +920,7 @@ async function streamOpenAICompatible(
   _onError: (error: Error) => void,
   controller: AbortController,
   useNativeSearch: boolean = false,
-  attachments?: ImageAttachment[],
+  _attachments?: ImageAttachment[],
 ) {
   const apiMessages: Array<{ role: string; content: any }> = [];
   if (systemPrompt) {
@@ -861,17 +932,38 @@ async function streamOpenAICompatible(
   );
   apiMessages.push(
     ...messages.map((m, i) => {
-      if (i === lastUserIdx && attachments && attachments.length > 0) {
-        const parts: any[] = [];
-        if (m.content) parts.push({ type: "text", text: m.content });
-        for (const att of attachments) {
-          if (att.mode === "vision") {
-            parts.push({ type: "image_url", image_url: { url: att.dataUri } });
-          }
+      // Separate vision and non-vision attachments (only ImageAttachments have mode)
+      const imageAttachments = m.attachments?.filter((a) => a.type === "image") as ImageAttachment[] | undefined || [];
+      const visionAttachments = imageAttachments.filter((a) => a.mode === "vision");
+      const ocrAttachments = imageAttachments.filter((a) => a.mode === "ocr");
+      const describeAttachments = imageAttachments.filter((a) => a.mode === "describe");
+      
+      // Build message content
+      let messageContent = m.content;
+      
+      // Add OCR extracted text
+      for (const att of ocrAttachments) {
+        if (att.description) {
+          messageContent += `\n\n[OCR from ${att.fileName}]\n${att.description}`;
         }
-        return { role: m.role, content: parts.length > 1 ? parts : m.content };
       }
-      return { role: m.role, content: m.content };
+      
+      // Add describe extracted text
+      for (const att of describeAttachments) {
+        if (att.description) {
+          messageContent += `\n\n[Image description of ${att.fileName}]\n${att.description}`;
+        }
+      }
+      
+      if (i === lastUserIdx && visionAttachments && visionAttachments.length > 0) {
+        const parts: any[] = [];
+        if (messageContent) parts.push({ type: "text", text: messageContent });
+        for (const att of visionAttachments) {
+          parts.push({ type: "image_url", image_url: { url: att.dataUri } });
+        }
+        return { role: m.role, content: parts.length > 1 ? parts : messageContent };
+      }
+      return { role: m.role, content: messageContent };
     }),
   );
 
@@ -895,11 +987,7 @@ async function streamOpenAICompatible(
       "Content-Type": "application/json",
       Authorization: `Bearer ${provider.apiKey}`,
     },
-    body: JSON.stringify({
-      model: model.id,
-      messages: apiMessages,
-      stream: true,
-    }),
+    body: JSON.stringify(body),
     signal: controller.signal,
   });
 
@@ -914,33 +1002,47 @@ async function streamOpenAICompatible(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data:")) continue;
-      const data = trimmed.slice(5).trim();
-      if (data === "[DONE]") {
-        onDone();
-        return;
-      }
-      try {
-        const parsed = JSON.parse(data);
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (content) onChunk(content);
-      } catch {
-        // Skip malformed JSON
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === "[DONE]") {
+          onDone();
+          return;
+        }
+        // Skip error objects that may appear in stream
+        if (data.startsWith("{") && data.includes("error")) {
+          console.warn("[OpenAI-compat] Ignoring error in stream:", data);
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(data);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) onChunk(content);
+        } catch {
+          // Skip malformed JSON
+        }
       }
     }
+  } finally {
+    // Read any remaining buffered data
+    if (buffer.trim()) {
+      if (buffer.includes("error")) {
+        console.warn("[OpenAI-compat] Ignoring error in buffered data:", buffer);
+      }
+    }
+    reader.releaseLock();
+    onDone();
   }
-
-  onDone();
 }
 
 async function streamAnthropic(

@@ -35,7 +35,13 @@
   --danger-border: #fecaca;
   --danger-fill: #f76a6a;
   --warning: #f7a96a;
+  --success: #22c55e;
   --overlay: rgba(0,0,0,.5);
+
+  /* ── Vision Mode Colors ── */
+  --vision-color: #3b82f6;
+  --ocr-color: #22c55e;
+  --describe-color: #a855f7;
 
   /* ── Code ── */
   --code-bg: #EDE8DF;
