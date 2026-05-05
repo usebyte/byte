@@ -192,6 +192,26 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
         },
       };
     });
+  } else if (provider.id === "openai") {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    if (!response.ok)
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    const data = await response.json();
+    const modelsData = data.data || [];
+    return modelsData
+      .filter((m: any) => m.id)
+      .map((m: any) => ({
+        id: m.id,
+        name: getDisplayName(m.id),
+        providerId: provider.id,
+        contextWindow: 128000, // OpenAI doesn't return context window in list
+        enabled: false,
+        capabilities: {
+          webSearch: modelHasNativeWebSearch(provider.id, m.id),
+          supportsVision: modelSupportsVision(provider.id, m.id),
+        },
+      }));
   } else if (provider.id === "groq") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
     const response = await fetch(`${provider.baseUrl}/models`, { headers });
