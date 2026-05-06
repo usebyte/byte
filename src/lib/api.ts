@@ -916,6 +916,9 @@ export function streamChat(
   extraContext?: string,
   attachments?: ImageAttachment[],
 ): StreamHandle {
+  const startTime = performance.now();
+  console.log(`[streamChat] Starting at ${startTime}`);
+  
   let isAborted = false;
 
   const abort = () => {
@@ -925,15 +928,26 @@ export function streamChat(
 
   const controller = new AbortController();
 
+  const t1 = performance.now();
   const config = chatConfig || getDefaultChatConfig();
+  const t2 = performance.now();
+  console.log(`[streamChat] getConfig took ${(t2-t1).toFixed(0)}ms`);
+  
   const useNativeSearch =
     config.enabledTools.includes("WEB_SEARCH") && model.capabilities?.webSearch;
+  
+  const t3 = performance.now();
   const basePrompt =
     simplifiedSystemPrompt ||
     assemblePrompt(config, memories, model).systemPrompt;
+  const t4 = performance.now();
+  console.log(`[streamChat] assemblePrompt took ${(t4-t3).toFixed(0)}ms`);
+  
   const systemPrompt = extraContext
     ? `${extraContext}\n\n${basePrompt}`
     : basePrompt;
+
+  console.log(`[streamChat] Initialization took ${(performance.now()-startTime).toFixed(0)}ms, now calling stream handler`);
 
   (async () => {
     try {
