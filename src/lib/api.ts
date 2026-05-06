@@ -429,17 +429,20 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     }
 
-    return modelsData.map((m: any) => ({
-      id: m.id || m.name,
-      name: m.name || getDisplayName(m.id || ""),
-      providerId: provider.id,
-      contextWindow: m.context_window || m.context_length || 4096,
-      enabled: false,
-      capabilities: {
-        webSearch: false,
-        supportsVision: modelSupportsVision(provider.id, m.id),
-      },
-    }));
+    return modelsData.map((m: any) => {
+      const modelId = m.id || m.name || "";
+      return {
+        id: modelId,
+        name: m.name || m.id || "",
+        providerId: provider.id,
+        contextWindow: m.context_window || m.context_length || 4096,
+        enabled: false,
+        capabilities: {
+          webSearch: false,
+          supportsVision: modelSupportsVision(provider.id, modelId),
+        },
+      };
+    });
   } else if (
     provider.id === "mistral" ||
     provider.id === "aleph_alpha" ||
