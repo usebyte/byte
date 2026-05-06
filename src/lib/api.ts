@@ -916,9 +916,6 @@ export function streamChat(
   extraContext?: string,
   attachments?: ImageAttachment[],
 ): StreamHandle {
-  const startTime = performance.now();
-  console.log(`[streamChat] Starting at ${startTime}`);
-  
   let isAborted = false;
 
   const abort = () => {
@@ -928,26 +925,15 @@ export function streamChat(
 
   const controller = new AbortController();
 
-  const t1 = performance.now();
   const config = chatConfig || getDefaultChatConfig();
-  const t2 = performance.now();
-  console.log(`[streamChat] getConfig took ${(t2-t1).toFixed(0)}ms`);
-  
   const useNativeSearch =
     config.enabledTools.includes("WEB_SEARCH") && model.capabilities?.webSearch;
-  
-  const t3 = performance.now();
   const basePrompt =
     simplifiedSystemPrompt ||
     assemblePrompt(config, memories, model).systemPrompt;
-  const t4 = performance.now();
-  console.log(`[streamChat] assemblePrompt took ${(t4-t3).toFixed(0)}ms`);
-  
   const systemPrompt = extraContext
     ? `${extraContext}\n\n${basePrompt}`
     : basePrompt;
-
-  console.log(`[streamChat] Initialization took ${(performance.now()-startTime).toFixed(0)}ms, now calling stream handler`);
 
   (async () => {
     try {
@@ -1103,9 +1089,6 @@ async function streamOpenAICompatible(
     }
   }
 
-  const startTime = performance.now();
-  console.log(`[${provider.id}] Starting request to ${provider.baseUrl}/chat/completions`);
-  
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
@@ -1122,9 +1105,6 @@ async function streamOpenAICompatible(
     signal: controller.signal,
   });
 
-  const fetchTime = performance.now() - startTime;
-  console.log(`[${provider.id}] Fetch completed in ${fetchTime.toFixed(0)}ms, status: ${response.status}`);
-
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`API error: ${response.status} ${error}`);
@@ -1135,18 +1115,11 @@ async function streamOpenAICompatible(
 
   const decoder = new TextDecoder();
   let buffer = "";
-  let chunkCount = 0;
-  const firstChunkTime = performance.now();
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      if (chunkCount === 0) {
-        const ttfb = performance.now() - firstChunkTime;
-        console.log(`[${provider.id}] First chunk received after ${ttfb.toFixed(0)}ms`);
-      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -1157,7 +1130,6 @@ async function streamOpenAICompatible(
         if (!trimmed || !trimmed.startsWith("data:")) continue;
         const data = trimmed.slice(5).trim();
         if (data === "[DONE]") {
-          console.log(`[${provider.id}] Stream complete after ${chunkCount} chunks`);
           onDone();
           return;
         }
@@ -1169,10 +1141,7 @@ async function streamOpenAICompatible(
         try {
           const parsed = JSON.parse(data);
           const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            onChunk(content);
-            chunkCount++;
-          }
+          if (content) onChunk(content);
         } catch {
           // Skip malformed JSON
         }
