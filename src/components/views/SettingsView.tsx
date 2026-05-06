@@ -625,19 +625,20 @@ function ModelsPanel({
   const [search, setSearch] = useState("");
 
   const allModels = providers.flatMap((p) =>
-    p.models.map((m) => ({ ...m, providerName: p.name })),
+    p.models.map((m) => ({ ...m, providerId: p.id, providerName: p.name })),
   );
   const filteredModels = search
-    ? allModels.filter(
-        (m) =>
-          (m.name || getDisplayName(m.id))
-            .toLowerCase()
-            .includes(search.toLowerCase()) && (m.contextWindow || 0) >= 10000,
+    ? allModels.filter((m) =>
+        (m.name || getDisplayName(m.id))
+          .toLowerCase()
+          .includes(search.toLowerCase()),
       )
-    : allModels.filter((m) => (m.contextWindow || 0) >= 10000);
+    : allModels;
   const sortedModels = [...filteredModels].sort((a, b) => {
-    const aEnabled = enabledModelIds.includes(a.id);
-    const bEnabled = enabledModelIds.includes(b.id);
+    const aKey = makeModelKey(a.providerId, a.id);
+    const bKey = makeModelKey(b.providerId, b.id);
+    const aEnabled = enabledModelIds.includes(aKey);
+    const bEnabled = enabledModelIds.includes(bKey);
     if (aEnabled && !bEnabled) return -1;
     if (!aEnabled && bEnabled) return 1;
     return 0;

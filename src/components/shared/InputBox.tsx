@@ -102,8 +102,6 @@ export function InputBox({
         return "OCR";
       case "describe":
         return "DESIGN";
-      default:
-        return mode.toUpperCase();
     }
   };
 
