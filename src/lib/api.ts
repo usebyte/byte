@@ -1089,15 +1089,27 @@ async function streamOpenAICompatible(
     }
   }
 
+  const startTime = performance.now();
+  console.log(`[${provider.id}] Starting request to ${provider.baseUrl}/chat/completions`);
+  
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  
+  // Only add Authorization header if we have an API key
+  if (provider.apiKey) {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+  }
+  
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${provider.apiKey}`,
-    },
+    headers,
     body: JSON.stringify(body),
     signal: controller.signal,
   });
+
+  const fetchTime = performance.now() - startTime;
+  console.log(`[${provider.id}] Fetch completed in ${fetchTime.toFixed(0)}ms, status: ${response.status}`);
 
   if (!response.ok) {
     const error = await response.text();
@@ -1109,11 +1121,18 @@ async function streamOpenAICompatible(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let chunkCount = 0;
+  const firstChunkTime = performance.now();
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+
+      if (chunkCount === 0) {
+        const ttfb = performance.now() - firstChunkTime;
+        console.log(`[${provider.id}] First chunk received after ${ttfb.toFixed(0)}ms`);
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -1124,6 +1143,7 @@ async function streamOpenAICompatible(
         if (!trimmed || !trimmed.startsWith("data:")) continue;
         const data = trimmed.slice(5).trim();
         if (data === "[DONE]") {
+          console.log(`[${provider.id}] Stream complete after ${chunkCount} chunks`);
           onDone();
           return;
         }
@@ -1135,7 +1155,10 @@ async function streamOpenAICompatible(
         try {
           const parsed = JSON.parse(data);
           const content = parsed.choices?.[0]?.delta?.content;
-          if (content) onChunk(content);
+          if (content) {
+            onChunk(content);
+            chunkCount++;
+          }
         } catch {
           // Skip malformed JSON
         }
