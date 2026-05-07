@@ -1,3 +1,4 @@
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import type {
   Provider,
   Model,
@@ -199,7 +200,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
   } else if (provider.id === "google") {
     // Always use the correct endpoint regardless of stored baseUrl
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${provider.apiKey}`;
-    const response = await fetch(url, { headers });
+    const response = await tauriFetch(url, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -224,7 +225,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     });
   } else if (provider.id === "openai") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -244,7 +245,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       }));
   } else if (provider.id === "groq") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -263,7 +264,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
   } else if (provider.id === "cerebras") {
     // Cerebras's public endpoint returns full model metadata including context_length.
     // No API key required — the key is still used for all chat requests.
-    const response = await fetch(
+    const response = await tauriFetch(
       "https://api.cerebras.ai/public/v1/models?format=openrouter",
     );
     if (!response.ok)
@@ -285,7 +286,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     }));
   } else if (provider.id === "huggingface") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/models?full=true`, {
+    const response = await tauriFetch(`${provider.baseUrl}/models?full=true`, {
       headers,
     });
     if (!response.ok)
@@ -310,7 +311,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       }));
   } else if (provider.id === "cohere") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/v1/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -330,7 +331,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
       }));
   } else if (provider.id === "perplexity") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -348,7 +349,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     }));
   } else if (provider.id === "together") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -366,7 +367,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     }));
   } else if (provider.id === "replicate") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch("https://api.replicate.com/v1/models", {
+    const response = await tauriFetch("https://api.replicate.com/v1/models", {
       headers,
     });
     if (!response.ok)
@@ -386,7 +387,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     }));
   } else if (provider.id === "fireworks") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -404,7 +405,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     }));
   } else if (provider.id === "openrouter") {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -423,12 +424,13 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
   } else if (provider.id === "ollama" || provider.id === "lmstudio") {
     let modelsData: any[] = [];
 
-    const response = await fetch(`${provider.baseUrl}/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/models`, { headers });
     if (response.ok) {
       const data = await response.json();
       modelsData = data.data || data.models || [];
     } else if (provider.id === "ollama") {
-      const listResponse = await fetch("http://localhost:11434/api/tags", {
+      const ollamaBase = provider.baseUrl.replace(/\/v1\/?$/, "");
+      const listResponse = await tauriFetch(`${ollamaBase}/api/tags`, {
         headers,
       });
       if (!listResponse.ok)
@@ -498,7 +500,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     provider.id === "modal"
   ) {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/v1/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -516,7 +518,7 @@ export async function fetchModels(provider: Provider): Promise<Model[]> {
     }));
   } else {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    const response = await fetch(`${provider.baseUrl}/v1/models`, { headers });
+    const response = await tauriFetch(`${provider.baseUrl}/v1/models`, { headers });
     if (!response.ok)
       throw new Error(`Failed to fetch models: ${response.statusText}`);
     const data = await response.json();
@@ -559,7 +561,7 @@ export async function extractTextFromImage(
     "Extract all visible text from this image. Return only the text you can see, preserving formatting and layout as much as possible. If there's no text, return '[No text found]'.";
 
   if (provider.id === "anthropic") {
-    const resp = await fetch(`${provider.baseUrl}/v1/messages`, {
+    const resp = await tauriFetch(`${provider.baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -593,7 +595,7 @@ export async function extractTextFromImage(
 
   if (provider.id === "google") {
     const modelName = model.id.replace("models/", "");
-    const resp = await fetch(
+    const resp = await tauriFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${provider.apiKey}`,
       {
         method: "POST",
@@ -616,7 +618,7 @@ export async function extractTextFromImage(
   }
 
   // OpenAI-compatible default
-  const resp = await fetch(`${provider.baseUrl}/chat/completions`, {
+  const resp = await tauriFetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -651,7 +653,7 @@ export async function describeImage(
     "Describe this image concisely and accurately in 1-3 sentences, focusing on what would be most useful context for answering questions about it.";
 
   if (provider.id === "anthropic") {
-    const resp = await fetch(`${provider.baseUrl}/v1/messages`, {
+    const resp = await tauriFetch(`${provider.baseUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -685,7 +687,7 @@ export async function describeImage(
 
   if (provider.id === "google") {
     const modelName = model.id.replace("models/", "");
-    const resp = await fetch(
+    const resp = await tauriFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${provider.apiKey}`,
       {
         method: "POST",
@@ -711,7 +713,7 @@ export async function describeImage(
   }
 
   // OpenAI-compatible default
-  const resp = await fetch(`${provider.baseUrl}/chat/completions`, {
+  const resp = await tauriFetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -820,7 +822,7 @@ async function streamGroq(
     }),
   );
 
-  const response = await fetch(
+  const response = await tauriFetch(
     "https://api.groq.com/openai/v1/chat/completions",
     {
       method: "POST",
@@ -1082,7 +1084,7 @@ async function streamOpenAICompatible(
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
   }
   
-  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+  const response = await tauriFetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -1199,7 +1201,7 @@ async function streamAnthropic(
     requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
   }
 
-  const response = await fetch(`${provider.baseUrl}/v1/messages`, {
+  const response = await tauriFetch(`${provider.baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1304,7 +1306,7 @@ async function streamGoogle(
     requestBody.groundingConfig = { sources: ["GOOGLE_SEARCH"] };
   }
 
-  const response = await fetch(url, {
+  const response = await tauriFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
@@ -1415,7 +1417,7 @@ export async function generateChatTitle(
         role: m.role === "system" ? "assistant" : m.role,
         content: m.content,
       }));
-      const response = await fetch(`${provider.baseUrl}/v1/messages`, {
+      const response = await tauriFetch(`${provider.baseUrl}/v1/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1437,7 +1439,7 @@ export async function generateChatTitle(
         "New chat"
       );
     } else if (provider.id === "google") {
-      const response = await fetch(
+      const response = await tauriFetch(
         `${provider.baseUrl}/v1/models/${model.id}:generateContent`,
         {
           method: "POST",
@@ -1467,7 +1469,7 @@ export async function generateChatTitle(
         "New chat"
       );
     } else {
-      const response = await fetch(`${provider.baseUrl}/v1/chat/completions`, {
+      const response = await tauriFetch(`${provider.baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1539,7 +1541,10 @@ async function sendOpenAICompatibleMessage(
     }
   }
 
-  const response = await fetch(`${provider.baseUrl}/v1/chat/completions`, {
+  const url = provider.baseUrl.endsWith("/v1")
+    ? `${provider.baseUrl}/chat/completions`
+    : `${provider.baseUrl}/v1/chat/completions`;
+  const response = await tauriFetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1611,7 +1616,7 @@ async function sendAnthropicMessage(
     requestBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
   }
 
-  const response = await fetch(`${provider.baseUrl}/v1/messages`, {
+  const response = await tauriFetch(`${provider.baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1676,7 +1681,7 @@ async function sendGoogleMessage(
     requestBody.groundingConfig = { sources: ["GOOGLE_SEARCH"] };
   }
 
-  const response = await fetch(url, {
+  const response = await tauriFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),
@@ -1719,7 +1724,7 @@ export async function searchWithLangSearch(
   apiKey: string,
   options?: { count?: number; freshness?: string },
 ): Promise<LangSearchResult[]> {
-  const response = await fetch("https://api.langsearch.com/v1/web-search", {
+  const response = await tauriFetch("https://api.langsearch.com/v1/web-search", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1759,7 +1764,7 @@ export async function fetchPageWithJina(url: string): Promise<string> {
 
   lastJinaCallTime = Date.now();
 
-  const response = await fetch(`https://r.jina.ai/${encodeURIComponent(url)}`, {
+  const response = await tauriFetch(`https://r.jina.ai/${encodeURIComponent(url)}`, {
     headers: { Accept: "text/markdown" },
   });
   if (!response.ok) throw new Error(`Jina error: ${response.status}`);

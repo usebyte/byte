@@ -170,10 +170,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          EXE="src-tauri/target/${{ matrix.target }}/release/Byte.exe"
-          if [ -f "$EXE" ]; then
-            cp "$EXE" "artifacts/Byte_x64.exe"
-          fi
+          EXE_DIR="src-tauri/target/${{ matrix.target }}/release"
+          for f in "$EXE_DIR"/*.exe; do
+            case "$(basename "$f")" in
+              app.exe|Byte.exe)
+                cp "$f" "artifacts/Byte_x64.exe"
+                echo "Captured $(basename "$f") as Byte_x64.exe"
+                ;;
+            esac
+          done
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
