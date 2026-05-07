@@ -37,8 +37,6 @@ export interface Message {
   webSearchSources?: { url: string; title: string }[];
   webSearchFetched?: { url: string; title: string }[];
   searchPhase?: "searching" | "fetching" | "done";
-  pythonCode?: string;
-  pythonPhase?: "loading" | "running" | "done" | "error";
   describePhase?: "describing" | "done"; // for describe-mode interstitial
 }
 
@@ -47,8 +45,7 @@ export type ToolId =
   | "URL_FETCH"
   | "FILE_READ"
   | "ASK_QUESTION"
-  | "CONFIRM_ACTION"
-  | "RUN_PYTHON";
+  | "CONFIRM_ACTION";
 
 export type ModeId = "CANVAS" | "COUNCIL";
 
